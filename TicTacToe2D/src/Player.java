@@ -126,9 +126,9 @@ public class Player {
     		int c = GameState.cellToCol(i);
     		current.rows[r]++;
     		current.cols[c]++;
-    		if (r-c == 0)		// main diagonal
+    		if (r-c == 0)						// main diagonal
     			current.diags[0]++;
-    		else if (r+c == GameState.BOARD_SIZE-1)	// anti diagonal
+    		if (r+c == GameState.BOARD_SIZE-1)	// anti diagonal
     			current.diags[1]++;
     	}
     	
