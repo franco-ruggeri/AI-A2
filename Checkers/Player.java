@@ -5,6 +5,12 @@ public class Player {
 	public final int depth = 9;
 	
 	private int nPlayer; 
+	
+	private HashMap<String, Integer> repeatedStates;
+		
+	public Player() {
+		repeatedStates = new HashMap<String, Integer>();
+	}
 		
     /**
      * Performs a move
@@ -43,13 +49,19 @@ public class Player {
 	            state = i;
 	        }
 	        i++;
-	    }
-	    return lNextStates.elementAt(state);
+	    }	    
+		return lNextStates.elementAt(state);
     }
     
     private int alphabeta (GameState state, int depth, double alpha, double beta, int player, Deadline deadline) {
+    	Integer stored = repeatedStates.get(makeKey(state));
+    	if (stored != null) {
+    		return stored;
+    	}
+    	
         if (depth == 0 || state.isEOG()) {
         	int value = eval (state);
+        	addToHash(state, value);
             return value;
         }
         
@@ -79,7 +91,81 @@ public class Player {
 
             }
         }
+        addToHash(state, v);
         return v;
+    }
+    
+    /**
+     * Adds to the HashMap the given GameState and all its symmetries
+     * @param state
+     * @param value The value of given GameState
+     */
+    private void addToHash(GameState state, int value) {
+    	String key = "";
+    	key = makeKey(state);
+    	repeatedStates.put(key, value);
+    	key = getSymmetricState(key);
+    	repeatedStates.put(key, value);
+    	key = getOpposedState(key);
+    	repeatedStates.put(key, -value);
+    	key = getSymmetricState(key);
+    	repeatedStates.put(key, -value);
+    }
+    
+    /**
+     * Creates the key for the HashTable of given GameState
+     * Key only depends on the position of the pieces and the player
+     * @param state
+     * @return The key to Hash the provided GameState
+     */
+    private String makeKey(GameState state) {
+    	String key = state.toMessage();
+    	String[] parts = key.split(" ");
+    	//Only depends on position of the pieces and the player
+    	key = parts[0] + " " + parts[2];
+    	return key;
+    }
+    
+    /**
+     * Creates the Symmetric State of given GameState message
+     * @param state
+     * @return
+     */
+    private String getSymmetricState(String state) {
+    	String result = "";
+    	String[] parts = state.split(" ");
+    	int i, j;
+    	char c;
+    	for (i = 0; i < 8; i++) {
+    		for (j = 3; j >= 0; j--) {
+    			c = parts[0].charAt(i*4 + j);
+    			result += c;
+    		}
+    	}
+    	return result + " " + parts[1];
+    }
+    
+    /**
+     * Creates the Opposed State of given GameState message
+     * @param state
+     * @return
+     */
+    private String getOpposedState(String state) {
+    	String result = "";
+    	String[] parts = state.split(" ");
+    	int i, j;
+    	char c;
+    	for (i = 7; i >= 0; i--) {
+    		for (j = 3; j >= 0; j--) {
+    			c = parts[0].charAt(i * 4 + j);
+    			if (c == 'r') c = 'w';
+    			else if (c == 'R') c = 'W';
+    			else if (c == 'w') c = 'r';
+    			else if (c == 'W') c = 'R';
+    			result += c;
+    		}
+    	}
+    	return result + " " + parts[1];
     }
     
     private int eval (GameState state) {
