@@ -2,40 +2,8 @@ import java.util.*;
 
 public class Player {
 	private int whoAmI;
-	private static final int DEPTH = 2;
-	private EvaluationData me, opponent;
-	
-    private class EvaluationData {
-    	int[][]  parallelX, parallelY, parallelZ;
-    	int[][] diagonalsXY, diagonalsXZ, diagonalsYZ;
-    	int[] mainDiagonals;
-    	int sum;
-    	
-    	EvaluationData() {
-    		// init
-    		parallelX = new int[GameState.BOARD_SIZE][GameState.BOARD_SIZE];
-    		parallelY = new int[GameState.BOARD_SIZE][GameState.BOARD_SIZE];
-    		parallelZ = new int[GameState.BOARD_SIZE][GameState.BOARD_SIZE];
-    		diagonalsXY = new int[GameState.BOARD_SIZE][2];
-    		diagonalsXZ = new int[GameState.BOARD_SIZE][2];
-    		diagonalsYZ = new int[GameState.BOARD_SIZE][2];
-    		mainDiagonals = new int[4];
-    		
-    		// clear
-    		for (int i=0; i<parallelX.length; i++) {
-    			Arrays.fill(parallelX[i], 0);
-    			Arrays.fill(parallelY[i], 0);
-    			Arrays.fill(parallelZ[i], 0);
-    		}
-    		for (int i=0; i<diagonalsXY.length; i++) {
-    			Arrays.fill(diagonalsXY[i], 0);
-    			Arrays.fill(diagonalsXZ[i], 0);
-    			Arrays.fill(diagonalsYZ[i], 0);
-    		}
-    		Arrays.fill(mainDiagonals, 0);
-    		sum = 0;
-    	}
-    }
+	private static final int DEPTH = 1;
+	private static final int POWER = 4;
 	
     /**
      * Performs a move
@@ -48,6 +16,7 @@ public class Player {
      */
     public GameState play(final GameState gameState, final Deadline deadline) {
         whoAmI = gameState.getNextPlayer();
+        System.err.println("I am " + whoAmI);
         return alphabeta(gameState, DEPTH);
     }
     
@@ -67,12 +36,6 @@ public class Player {
     	if (nextStates.isEmpty())
     		return new GameState(state, new Move());
 
-    	// init evaluation data
-    	me = new EvaluationData();
-    	opponent = new EvaluationData();
-    	for (int i=0; i<GameState.CELL_COUNT; i++)
-    		updateEvaluationData(state, i);
-    	
     	// find action maximizing the "utility"
     	for (GameState s : nextStates) {
     		int tmp = alphabetaR(s, depth-1, Integer.MIN_VALUE, Integer.MAX_VALUE);
@@ -101,9 +64,7 @@ public class Player {
     	else if (player == whoAmI) {
     		v = Integer.MIN_VALUE;
     		for (GameState s : nextStates) {
-    			updateEvaluationData(state, s.getMove().at(0));
     			int tmp = alphabetaR(s, depth-1, alpha, beta);
-    			backtrackEvaluationData(state, s.getMove().at(0));
     			if (tmp > v)
     				v = tmp;
     			if (tmp > alpha)
@@ -116,9 +77,7 @@ public class Player {
     	else {
     		v = Integer.MAX_VALUE;
     		for (GameState s : nextStates) {
-    			updateEvaluationData(state, s.getMove().at(0));
     			int tmp = alphabetaR(s, depth-1, alpha, beta);
-    			backtrackEvaluationData(state, s.getMove().at(0));
     			if (tmp < v)
     				v = tmp;
     			if (tmp < beta)
@@ -131,343 +90,108 @@ public class Player {
     	return v;
     }
     
+    private class EvaluationData {
+    	int[][]  parallelX, parallelY, parallelZ;
+    	int[][] diagonalsXY, diagonalsXZ, diagonalsYZ;
+    	int[] mainDiagonals;
+    	
+    	EvaluationData() {
+    		parallelX = new int[GameState.BOARD_SIZE][GameState.BOARD_SIZE];
+    		parallelY = new int[GameState.BOARD_SIZE][GameState.BOARD_SIZE];
+    		parallelZ = new int[GameState.BOARD_SIZE][GameState.BOARD_SIZE];
+    		diagonalsXY = new int[GameState.BOARD_SIZE][2];
+    		diagonalsXZ = new int[GameState.BOARD_SIZE][2];
+    		diagonalsYZ = new int[GameState.BOARD_SIZE][2];
+    		mainDiagonals = new int[4];
+    	}
+    }
+    
     private int evaluate(GameState state) {
-    	// terminal state, the result is certain
-    	if (state.isEOG()) {
-    		if (isWin(state))
-    			return Integer.MAX_VALUE;
-    		else if (isLoss(state))
-    			return Integer.MIN_VALUE;
-    		else
-    			return 0;	// draw
+    	EvaluationData me = new EvaluationData();
+    	EvaluationData opponent = new EvaluationData();
+    	
+    	// fill evaluation data
+    	for (int i=0; i<GameState.CELL_COUNT; i++) {
+    		int mark = state.at(i);
+    		if (mark == Constants.CELL_EMPTY)
+    			continue;
+    		
+    		EvaluationData current = (mark==whoAmI ? me : opponent);
+    		int x = GameState.cellToRow(i);
+    		int y = GameState.cellToCol(i);
+    		int z = GameState.cellToLay(i);
+    		
+    		// orthogonal rows
+    		current.parallelX[y][z]++;
+    		current.parallelY[x][z]++;
+    		current.parallelZ[x][y]++;
+    		
+    		// diagonals
+    		if (x == y)
+    			current.diagonalsXY[z][0]++;
+    		if (x+y == GameState.BOARD_SIZE-1)
+    			current.diagonalsXY[z][1]++;
+    		if (x == z)
+    			current.diagonalsXZ[y][0]++;
+    		if (x+z == GameState.BOARD_SIZE-1)
+    			current.diagonalsXZ[y][1]++;
+    		if (y == z)
+    			current.diagonalsYZ[x][0]++;
+    		if (y+z == GameState.BOARD_SIZE-1)
+    			current.diagonalsYZ[x][1]++;
+    		
+    		// main diagonals
+    		if (x == y && y == z)
+    			current.mainDiagonals[0]++;
+    		if (x == y && z == GameState.BOARD_SIZE-1-x)
+    			current.mainDiagonals[1]++;
+    		if (x+y == GameState.BOARD_SIZE-1 && x == z)
+    			current.mainDiagonals[2]++;
+    		if (x+y == GameState.BOARD_SIZE-1 && y == z)
+    			current.mainDiagonals[3]++;
     	}
     	
-    	// estimate
-    	return me.sum - opponent.sum;
-    }
-    
-    private void updateEvaluationData(GameState state, int cell) {
-    	int mark = state.at(cell);
-		
-		int x = GameState.cellToRow(cell);
-		int y = GameState.cellToCol(cell);
-		int z = GameState.cellToLay(cell);
-		
-		EvaluationData current = (mark==whoAmI ? me : opponent);
-		EvaluationData other = (mark==whoAmI ? opponent : me);
-		
-		// orthogonal rows
-		if (other.parallelX[y][z] > 0) {
-			other.sum -= other.parallelX[y][z];
-			other.parallelX[y][z] = 0;
-		} else {
-			current.parallelX[y][z]++;
-			current.sum++;
-		}
-		if (other.parallelY[x][z] > 0) {
-			other.sum -= other.parallelY[x][z];
-			other.parallelY[x][z] = 0;
-		} else {
-			current.parallelY[y][z]++;
-			current.sum++;
-		}
-		if (other.parallelZ[x][y] > 0) {
-			other.sum -= other.parallelZ[x][y];
-			other.parallelZ[x][y] = 0;
-		} else {
-			current.parallelZ[x][y]++;
-			current.sum++;
-		}
-		
-		// diagonals
-		if (x-y == 0) {
-			if (other.diagonalsXY[z][0] > 0) {
-				other.sum -= other.diagonalsXY[z][0];
-				other.diagonalsXY[z][0] = 0;
-			} else {
-				current.diagonalsXY[z][0]++;
-				current.sum++;
-			}
-			
-			// main diagonals
-			if (x == z) {
-				if (other.mainDiagonals[0] > 0) {
-					other.sum -= other.mainDiagonals[0];
-					other.mainDiagonals[0] = 0;
-				} else {
-					current.mainDiagonals[0]++;
-					current.sum++;
-				}
-			} else if (x+z == GameState.BOARD_SIZE-1) {
-				if (other.mainDiagonals[1] > 0) {
-					other.sum -= other.mainDiagonals[1];
-					other.mainDiagonals[1] = 0;
-				} else {
-					current.mainDiagonals[1]++;
-					current.sum++;
-				}
-			}
-		} else if (x+y == GameState.BOARD_SIZE-1) {
-			if (other.diagonalsXY[z][1] > 0) {
-				other.sum -= other.diagonalsXY[z][1];
-				other.diagonalsXY[z][1] = 0;
-			} else {
-				current.diagonalsXY[z][1]++;
-				current.sum++;
-			}
-			
-			// main diagonals
-			if (x == z) {
-				if (other.mainDiagonals[2] > 0) {
-					other.sum -= other.mainDiagonals[2];
-					other.mainDiagonals[2] = 0;
-				} else {
-					current.mainDiagonals[2]++;
-					current.sum++;
-				}
-			} else if (x+z == GameState.BOARD_SIZE-1) {
-				if (other.mainDiagonals[3] > 0) {
-					other.sum -= other.mainDiagonals[3];
-					other.mainDiagonals[3] = 0;
-				} else {
-					current.mainDiagonals[3]++;
-					current.sum++;
-				}
-			}
-		}
-		if (x-z == 0) {
-			if (other.diagonalsXZ[y][0] > 0) {
-				other.sum -= other.diagonalsXZ[y][0];
-				other.diagonalsXZ[y][0] = 0;
-			} else {
-				current.sum++;
-				current.diagonalsXZ[y][0]++;
-			}
-		} else if (x+z == GameState.BOARD_SIZE-1) {
-			if (other.diagonalsXZ[y][1] > 0) {
-				other.sum -= other.diagonalsXZ[y][1];
-				other.diagonalsXZ[y][1] = 0;
-			} else {
-				current.diagonalsXZ[y][1]++;
-				current.sum++;
-			}
-		}
-		if (y-z == 0) {
-			if (other.diagonalsYZ[x][0] > 0) {
-				other.sum -= other.diagonalsYZ[x][0];
-				other.diagonalsYZ[x][0] = 0;
-			} else {
-				current.diagonalsYZ[x][0]++;
-				current.sum++;
-			}
-		} else if (y+z == GameState.BOARD_SIZE-1) {
-			if (other.diagonalsYZ[x][1] > 0) {
-				other.sum -= other.diagonalsYZ[x][1];
-				other.diagonalsYZ[x][1] = 0;
-			} else {
-				current.diagonalsYZ[x][1]++;
-				current.sum++;
-			}
-		}
-    }
-    
-    private void backtrackEvaluationData(GameState state, int cell) {
-    	// TODO: aggiungere main diagonals
-    	
-    	int mark = state.at(cell);
-    	int otherMark = (mark==Constants.CELL_X ? Constants.CELL_O : Constants.CELL_X);
-		
-		int x = GameState.cellToRow(cell);
-		int y = GameState.cellToCol(cell);
-		int z = GameState.cellToLay(cell);
-		
-		EvaluationData current = (mark==whoAmI ? me : opponent);
-		EvaluationData other = (mark==whoAmI ? opponent : me);
-		
-		// the cell has become empty
-		if (state.at(cell) != Constants.CELL_EMPTY)
-			throw new RuntimeException("Non-empty cell during backtrack.");
-		
-		// orthogonal rows
-		if (current.parallelX[y][z] > 0) {
-			current.parallelX[y][z]--;
-			current.sum--;
-		} else if (other.parallelX[y][z] == 0) {	// it may have been cleared, re-update
-			int tmpSum = 0;
-			boolean foundOther = false;
-			for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-				if (state.at(i, y, z) == otherMark) {
-					other.parallelX[y][z]++;
-					tmpSum++;
-				} else {
-					foundOther = true;
-				}
-			}
-			if (!foundOther)
-				other.sum += tmpSum;
-			else
-				other.parallelX[y][z] = 0;
-		}
-		if (current.parallelY[x][z] > 0) {
-			current.parallelY[x][z]--;
-			current.sum--;
-		} else if (other.parallelY[x][z] == 0) {
-			int tmpSum = 0;
-			boolean foundOther = false;
-			for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-				if (state.at(x, i, z) == otherMark) {
-					other.parallelY[x][z]++;
-					tmpSum++;
-				} else {
-					foundOther = true;
-				}
-			}
-			if (!foundOther)
-				other.sum += tmpSum;
-			else
-				other.parallelY[x][z] = 0;
-		}
-		if (current.parallelZ[x][y] > 0) {
-			current.parallelZ[x][y]--;
-			current.sum--;
-		} else if (other.parallelZ[x][y] == 0) {
-			int tmpSum = 0;
-			boolean foundOther = false;
-			for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-				if (state.at(x, y, i) == otherMark) {
-					other.parallelZ[x][y]++;
-					tmpSum++;
-				} else {
-					foundOther = true;
-				}
-			}
-			if (!foundOther)
-				other.sum += tmpSum;
-			else
-				other.parallelY[x][y] = 0;
-		}
-		
-		// diagonals
-		if (x-y == 0) {
-			if (current.diagonalsXY[z][0] > 0) {
-				current.diagonalsXY[z][0]--;
-				current.sum--;
-			} else if (other.diagonalsXY[z][0] == 0) {
-				int tmpSum = 0;
-				boolean foundOther = false;
-				for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-					if (state.at(i, i, z) == otherMark) {
-						other.diagonalsXY[z][0]++;
-						tmpSum++;
-					}
-				}
-				if (!foundOther)
-					other.sum += tmpSum;
-				else
-					other.diagonalsXY[z][0] = 0;
-			}
-		} else if (x+y == GameState.BOARD_SIZE-1) {
-			if (current.diagonalsXY[z][1] > 0) {
-				current.diagonalsXY[z][1]--;
-				current.sum--;
-			} else if (other.diagonalsXY[z][1] == 0) {
-				int tmpSum = 0;
-				boolean foundOther = false;
-				for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-					if (state.at(i, GameState.BOARD_SIZE-1-i, z) == otherMark) {
-						other.diagonalsXY[z][1]++;
-						tmpSum++;
-					}
-				}
-				if (!foundOther)
-					other.sum += tmpSum;
-				else
-					other.diagonalsXY[z][1] = 0;
-			}
-		}
-		if (x-z == 0) {
-			if (current.diagonalsXZ[y][0] > 0) {
-				current.diagonalsXZ[y][0]--;
-				current.sum--;
-			} else if (other.diagonalsXZ[y][0] == 0) {
-				int tmpSum = 0;
-				boolean foundOther = false;
-				for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-					if (state.at(i, y, i) == otherMark) {
-						other.diagonalsXZ[y][0]++;
-						tmpSum++;
-					}
-				}
-				if (!foundOther)
-					other.sum += tmpSum;
-				else
-					other.diagonalsXZ[y][0] = 0;
-			}
-		} else if (x+z == GameState.BOARD_SIZE-1) {
-			if (current.diagonalsXZ[y][1] > 0) {
-				current.diagonalsXZ[y][1]--;
-				current.sum--;
-			} else if (other.diagonalsXZ[y][1] == 0) {
-				int tmpSum = 0;
-				boolean foundOther = false;
-				for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-					if (state.at(i, y, GameState.BOARD_SIZE-1-i) == otherMark) {
-						other.diagonalsXZ[y][1]++;
-						tmpSum++;
-					}
-				}
-				if (!foundOther)
-					other.sum += tmpSum;
-				else
-					other.diagonalsXZ[y][1] = 0;
-			}
-		}
-		if (y-z == 0) {
-			if (current.diagonalsYZ[y][0] > 0) {
-				current.diagonalsYZ[y][0]--;
-				current.sum--;
-			} else if (other.diagonalsYZ[y][0] == 0) {
-				int tmpSum = 0;
-				boolean foundOther = false;
-				for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-					if (state.at(x, i, i) == otherMark) {
-						other.diagonalsYZ[x][0]++;
-						tmpSum++;
-					}
-				}
-				if (!foundOther)
-					other.sum += tmpSum;
-				else
-					other.diagonalsYZ[x][0] = 0;
-			}
-		} else if (y+z == GameState.BOARD_SIZE-1) {
-			if (current.diagonalsYZ[y][1] > 0) {
-				current.diagonalsYZ[y][1]--;
-				current.sum--;
-			} else if (other.diagonalsYZ[y][1] == 0) {
-				int tmpSum = 0;
-				boolean foundOther = false;
-				for (int i=0; i<GameState.BOARD_SIZE && !foundOther; i++) {
-					if (state.at(x, i, GameState.BOARD_SIZE-1-i) == otherMark) {
-						other.diagonalsYZ[x][1]++;
-						tmpSum++;
-					}
-				}
-				if (!foundOther)
-					other.sum += tmpSum;
-				else
-					other.diagonalsYZ[x][1] = 0;
-			}
-		}
-    }
-    
-    private boolean isWin(GameState state) {
-    	return (whoAmI == Constants.CELL_X && state.isXWin()) ||
-    			(whoAmI == Constants.CELL_O && state.isOWin());
-    }
-    
-    private boolean isLoss(GameState state) {
-    	return (whoAmI == Constants.CELL_X && state.isOWin()) ||
-    			(whoAmI == Constants.CELL_O && state.isXWin());
+    	// count only lines that can lead to victory
+    	int score = 0;
+    	for (int i=0; i<me.parallelX.length; i++) {
+    		for (int j=0; j<me.parallelX[i].length; j++) {
+    			if (me.parallelX[i][j] == 0 || opponent.parallelX[i][j] == 0) {
+    				int tmp = me.parallelX[i][j] - opponent.parallelX[i][j];
+    				score += tmp  < 0 ? -Math.pow(tmp, POWER) : Math.pow(tmp, POWER);
+    			}
+    			if (me.parallelY[i][j] == 0 || opponent.parallelY[i][j] == 0) {
+    				int tmp = me.parallelY[i][j] - opponent.parallelY[i][j];
+    				score += tmp < 0 ? -Math.pow(tmp, POWER) : Math.pow(tmp, POWER);
+    			}
+    			if (me.parallelZ[i][j] == 0 || opponent.parallelZ[i][j] == 0) {
+    				int tmp = me.parallelZ[i][j] - opponent.parallelZ[i][j];
+    				score += tmp < 0 ? -Math.pow(tmp, POWER) : Math.pow(tmp, POWER);
+    			}
+    		}
+    	}
+    	for (int i=0; i<me.diagonalsXY.length; i++) {
+    		for (int j=0; j<me.diagonalsXY[i].length; j++) {
+    			if (me.diagonalsXY[i][j] == 0 || opponent.diagonalsXY[i][j] == 0) {
+    				int tmp = me.diagonalsXY[i][j] - opponent.diagonalsXY[i][j];
+    				score += tmp < 0 ? -Math.pow(tmp, POWER) : Math.pow(tmp, POWER);
+    			}
+    			if (me.diagonalsXZ[i][j] == 0 || opponent.diagonalsXZ[i][j] == 0) {
+    				int tmp = me.diagonalsXZ[i][j] - opponent.diagonalsXZ[i][j];
+    				score += tmp < 0 ? -Math.pow(tmp, POWER) : Math.pow(tmp, POWER);
+    			}
+    			if (me.diagonalsYZ[i][j] == 0 || opponent.diagonalsYZ[i][j] == 0) {
+    				int tmp = me.diagonalsYZ[i][j] - opponent.diagonalsYZ[i][j];
+    				score += tmp < 0 ? -Math.pow(tmp, POWER) : Math.pow(tmp, POWER);
+    			}
+    		}
+    	}
+    	for (int i=0; i<me.mainDiagonals.length; i++) {
+    		if (me.mainDiagonals[i] == 0 || opponent.mainDiagonals[i] == 0) {
+    			int tmp = me.mainDiagonals[i] - opponent.mainDiagonals[i];
+				score += tmp < 0 ? -Math.pow(tmp, POWER) : Math.pow(tmp, POWER);
+    		}
+    	}
+
+    	return score;
     }
 }
