@@ -110,6 +110,16 @@ public class Player {
     	EvaluationData me = new EvaluationData();
     	EvaluationData opponent = new EvaluationData();
     	
+    	// terminal state, the result is certain
+    	if (state.isEOG()) {
+    		if (isWin(state))
+    			return Integer.MAX_VALUE;
+    		else if (isLoss(state))
+    			return Integer.MIN_VALUE;
+    		else
+    			return 0;	// draw
+    	}
+    	
     	// fill evaluation data
     	for (int i=0; i<GameState.CELL_COUNT; i++) {
     		int mark = state.at(i);
@@ -193,5 +203,15 @@ public class Player {
     	}
 
     	return score;
+    }
+    
+    private boolean isWin(GameState state) {
+    	return (whoAmI == Constants.CELL_X && state.isXWin()) ||
+    			(whoAmI == Constants.CELL_O && state.isOWin());
+    }
+    
+    private boolean isLoss(GameState state) {
+    	return (whoAmI == Constants.CELL_X && state.isOWin()) ||
+    			(whoAmI == Constants.CELL_O && state.isXWin());
     }
 }
