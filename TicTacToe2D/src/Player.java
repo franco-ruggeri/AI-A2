@@ -2,7 +2,7 @@ import java.util.*;
 
 public class Player {
 	private int whoAmI;
-	private static final int DEPTH = 3;
+	private static final int DEPTH = 5;
 	
     /**
      * Performs a move
@@ -99,10 +99,6 @@ public class Player {
         	Arrays.fill(cols, 0);
         	Arrays.fill(diags, 0);
     	}
-    	
-    	int sum() {
-    		return Arrays.stream(rows).sum() + Arrays.stream(cols).sum() + Arrays.stream(diags).sum();
-    	}
     }
     
     private int evaluate(GameState state) {
@@ -119,29 +115,44 @@ public class Player {
     			return 0;	// draw
     	}
     	
-    	// estimate
+    	// fill evaluation data
     	for (int i=0; i<GameState.CELL_COUNT; i++) {
     		int mark = state.at(i);
     		if (mark == Constants.CELL_EMPTY)
     			continue;
     		
     		EvaluationData current = (mark==whoAmI ? me : opponent);
-    		EvaluationData other = (mark==whoAmI ? opponent : me);
 			int r = GameState.cellToRow(i);
     		int c = GameState.cellToCol(i);
     		current.rows[r]++;
-    		other.rows[r] = 0;	// clear, count only lines that could lead to victory
     		current.cols[c]++;
-    		other.cols[c] = 0;
-    		if (r-c == 0) {		// main diagonal
+    		if (r-c == 0)		// main diagonal
     			current.diags[0]++;
-    			other.diags[0] = 0;
-    		} else if (r+c == GameState.BOARD_SIZE-1) {	// anti diagonal
+    		else if (r+c == GameState.BOARD_SIZE-1)	// anti diagonal
     			current.diags[1]++;
-    			other.diags[1] = 0;
+    	}
+    	
+    	// count only lines that can lead to victory
+    	int scoreMe = 0;
+    	int scoreOpponent = 0;
+    	for (int i=0; i<me.rows.length; i++) {
+    		if (me.rows[i] == 0 || opponent.rows[i] == 0) {
+    			scoreMe += me.rows[i];
+    			scoreOpponent += opponent.rows[i];
+    		}
+    		if (me.cols[i] == 0 || opponent.cols[i] == 0) {
+    			scoreMe += me.cols[i];
+    			scoreOpponent += opponent.cols[i];
     		}
     	}
-    	return me.sum() - opponent.sum();
+    	for (int i=0; i<me.diags.length; i++) {
+    		if (me.diags[i] == 0 || opponent.diags[i] == 0) {
+    			scoreMe += me.diags[i];
+    			scoreOpponent += opponent.diags[i];
+    		}
+    	}
+    	
+    	return scoreMe - scoreOpponent;
     }
     
     private boolean isWin(GameState state) {
@@ -153,4 +164,5 @@ public class Player {
     	return (whoAmI == Constants.CELL_X && state.isOWin()) ||
     			(whoAmI == Constants.CELL_O && state.isXWin());
     }
+    
 }
