@@ -2,14 +2,20 @@ import java.util.*;
 
 public class Player {
 	
-	public final int depth = 9;
+	public final int depth = 10;
 	
-	private int nPlayer; 
+	private int myPlayer, otherPlayer; 
 	
-	private HashMap<String, Integer> repeatedStates;
+	private HashMap<String, Integer> redStates;
+	private HashMap<String, Integer> whiteStates;
+	private HashMap<String, Integer> currentPlayerStates;
+	private HashMap<String, Integer> otherPlayerStates;
+
 		
 	public Player() {
-		repeatedStates = new HashMap<String, Integer>();
+		redStates = new HashMap<String, Integer>();
+		whiteStates = new HashMap<String, Integer>();
+		System.err.println("Inicializado");
 	}
 		
     /**
@@ -23,7 +29,10 @@ public class Player {
      */
     public GameState play(final GameState pState, final Deadline pDue) {
     	
-    	nPlayer = (compare(pState.getNextPlayer(),Constants.CELL_RED) ? Constants.CELL_WHITE : Constants.CELL_RED);
+    	myPlayer = pState.getNextPlayer();
+    	otherPlayer = (compare(myPlayer,Constants.CELL_RED) ? Constants.CELL_WHITE : Constants.CELL_RED);
+    	currentPlayerStates = (compare(myPlayer,Constants.CELL_RED) ? redStates : whiteStates);
+    	otherPlayerStates = (compare(myPlayer,Constants.CELL_RED) ? whiteStates : redStates);
 
         Vector<GameState> lNextStates = new Vector<GameState>();
         pState.findPossibleMoves(lNextStates);
@@ -43,7 +52,7 @@ public class Player {
 	    int aux = 0;
 	    int i = 0;
 	    for (GameState child : lNextStates) {
-	        aux = alphabeta(child, depth, Integer.MIN_VALUE, Integer.MAX_VALUE, pState.getNextPlayer(), pDue);
+	        aux = alphabeta(child, depth, Integer.MIN_VALUE, Integer.MAX_VALUE, pDue);
 	        if (aux > v) {
 	            v = aux;
 	            state = i;
@@ -53,8 +62,8 @@ public class Player {
 		return lNextStates.elementAt(state);
     }
     
-    private int alphabeta (GameState state, int depth, double alpha, double beta, int player, Deadline deadline) {
-    	Integer stored = repeatedStates.get(makeKey(state));
+    private int alphabeta (GameState state, int depth, double alpha, double beta, Deadline deadline) {
+    	Integer stored = currentPlayerStates.get(makeKey(state));
     	if (stored != null) {
     		return stored;
     	}
@@ -65,14 +74,16 @@ public class Player {
             return value;
         }
         
+        int player = state.getNextPlayer();
+        
         Vector<GameState> nextStates = new Vector<GameState>();
         state.findPossibleMoves(nextStates);
         
         int v;
-        if (compare(player,Constants.CELL_RED)) {
+        if (compare(myPlayer,player)) {
             v = Integer.MIN_VALUE;
             for(GameState child : nextStates) {
-                v = Math.max(v, alphabeta(child, depth-1, alpha, beta, Constants.CELL_WHITE, deadline));
+                v = Math.max(v, alphabeta(child, depth-1, alpha, beta, deadline));
                 alpha = Math.max(alpha, v);
                 if (beta <= alpha) {
                     return v;
@@ -83,7 +94,7 @@ public class Player {
         else {
             v = Integer.MAX_VALUE;
             for (GameState child: nextStates) {
-                v = Math.min(v, alphabeta(child, depth-1, alpha, beta, Constants.CELL_RED, deadline));
+                v = Math.min(v, alphabeta(child, depth-1, alpha, beta, deadline));
                 beta = Math.min(beta, v);
                 if (beta <= alpha) {
                     return v;
@@ -103,13 +114,17 @@ public class Player {
     private void addToHash(GameState state, int value) {
     	String key = "";
     	key = makeKey(state);
-    	repeatedStates.put(key, value);
+    	currentPlayerStates.put(key, value);
+    	otherPlayerStates.put(key, -value);
     	key = getSymmetricState(key);
-    	repeatedStates.put(key, value);
+    	currentPlayerStates.put(key, value);
+    	otherPlayerStates.put(key, -value);
     	key = getOpposedState(key);
-    	repeatedStates.put(key, -value);
+    	currentPlayerStates.put(key, -value);
+    	otherPlayerStates.put(key, value);
     	key = getSymmetricState(key);
-    	repeatedStates.put(key, -value);
+    	currentPlayerStates.put(key, -value);
+    	otherPlayerStates.put(key, value);
     }
     
     /**
@@ -132,8 +147,8 @@ public class Player {
      * @return
      */
     private String getSymmetricState(String state) {
-    	String result = "";
     	String[] parts = state.split(" ");
+    	String result = "", player = parts[1];
     	int i, j;
     	char c;
     	for (i = 0; i < 8; i++) {
@@ -142,7 +157,7 @@ public class Player {
     			result += c;
     		}
     	}
-    	return result + " " + parts[1];
+    	return result + " " + player;
     }
     
     /**
@@ -151,8 +166,8 @@ public class Player {
      * @return
      */
     private String getOpposedState(String state) {
-    	String result = "";
     	String[] parts = state.split(" ");
+    	String result = "", player = parts[1];
     	int i, j;
     	char c;
     	for (i = 7; i >= 0; i--) {
@@ -165,43 +180,67 @@ public class Player {
     			result += c;
     		}
     	}
-    	return result + " " + parts[1];
+    	player = player == "r" ? "w" : "r";
+    	return result + " " + player;
     }
     
     private int eval (GameState state) {
     	int globalSum = 0;
-    	int partialSum;
+    	int myPartialSum, othersPartialSum;
     	int i;
-    	int pos;
+    	int piece;
     	
-    	partialSum = 0; 
+    	boolean amIRed = compare(myPlayer, Constants.CELL_RED);
+    	if (state.isRedWin() && amIRed)
+    		return Integer.MAX_VALUE;
+    	else if (state.isRedWin() && !amIRed)
+    		return Integer.MIN_VALUE + 1;
+    	else if (state.isWhiteWin() && amIRed)
+    		return Integer.MIN_VALUE + 1;
+    	else if (state.isWhiteWin() && !amIRed)
+    		return Integer.MAX_VALUE;
+    	else if (state.isDraw())
+    		return 0;
+    	
+    	myPartialSum = othersPartialSum = 0; 
     	for (i = 0; i < GameState.NUMBER_OF_SQUARES; i++) {
-    		pos = state.get(i);
-    		if (compare(pos, Constants.CELL_RED)) {
-    			if (compare(pos, Constants.CELL_KING)) {
-    				partialSum += 10;
+    		piece = state.get(i);
+    		if (compare(piece, myPlayer)) {
+    			if (compare(piece, Constants.CELL_KING)) {
+    				myPartialSum += 10;
     			} else {    				
-    				partialSum += 1; //GameState.cellToRow(i);
-    				partialSum *= Math.abs(partialSum);
+    				myPartialSum += getRelativeRow(piece, i);
     			}
-    		} else if (compare(pos, Constants.CELL_WHITE)) {
-    			if (compare(pos, Constants.CELL_KING)) {
-    				partialSum -= 10;
+    		} else if (compare(piece, otherPlayer)) {
+    			if (compare(piece, Constants.CELL_KING)) {
+    				othersPartialSum += 10;
     			} else {    				
-    				partialSum -= 1; //7 - GameState.cellToRow(i);
-    				partialSum *= Math.abs(partialSum);
-    			}
+    				othersPartialSum += getRelativeRow(piece, i);
+				}
     		}
     	}
-    	globalSum += partialSum;
-    	    	
-    	globalSum *= compare(nPlayer, Constants.CELL_RED) ? -1 : 1;
+//    	myPartialSum *= myPartialSum;
+//    	othersPartialSum *= othersPartialSum;
+    	globalSum = myPartialSum - othersPartialSum;
     	
     	return globalSum;
+    }
+    
+    /**
+     * 
+     * @param piece
+     * @return
+     */
+    private int getRelativeRow(int piece, int position) {
+    	if (compare(piece,Constants.CELL_RED))
+    		return GameState.cellToRow(position);
+    	else
+    		return 7 - GameState.cellToRow(position);
     }
     
     private boolean compare(int a, int b) {
     	boolean v = (a&b) != 0;
     	return v;
     }
+    
 }
