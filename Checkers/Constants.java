@@ -32,6 +32,38 @@ public class Constants {
   };
 
   /**
+   * A more sophisticated way of representing the pieces of the board, using
+   * the Unicode character set.
+   */
+  public static final String[] UNICODE_TEXT = {
+      ". ", // CELL_EMPTY
+      "r ", // CELL_RED
+      "w ", // CELL_WHITE
+      "? ", // Unused
+      "? ", // Unused
+      "R ", // CELL_RED | CELL_KING
+      "W ", // CELL_WHITE | CELL_KING
+      "? ", // Unused
+      "  ", // CELL_INVALID
+  };
+
+  /**
+   * A quite sophisticated way of representing the pieces of the board, using
+   * the Unicode character set with colors.
+   */
+  public static final String[] COLOR_TEXT = {
+      ". ", // CELL_EMPTY
+      "r ", // CELL_RED
+      "w ", // CELL_WHITE
+      "? ", // Unused
+      "? ", // Unused
+      "R ", // CELL_RED | CELL_KING
+      "W ", // CELL_WHITE | CELL_KING
+      "? ", // Unused
+      "  ", // CELL_INVALID
+  };
+
+  /**
    * Symbols used for messages between clients.
    */
   public static final char[] MESSAGE_SYMBOLS = {

@@ -32,42 +32,60 @@ public class Player {
      * @return the next state the board is in after our move
      */
     public GameState play(final GameState pState, final Deadline pDue) {
-    	//Assign which player I am 
-    	myPlayer = pState.getNextPlayer();
-    	//Assign which player the other is
-    	otherPlayer = (compare(myPlayer,Constants.CELL_RED) ? Constants.CELL_WHITE : Constants.CELL_RED);
-    	//Assign which my current HashTable is
-    	currentPlayerStates = (compare(myPlayer,Constants.CELL_RED) ? redStates : whiteStates);
-    	//Assign which the other's HashTable is
-    	otherPlayerStates = (compare(myPlayer,Constants.CELL_RED) ? whiteStates : redStates);
+    	// assign player
+    	whoAmI = pState.getNextPlayer();
+    	
+    	// assign hash tables
+    	
+        deadline = pDue;
+        return alphabeta(pState);
+    }
+    
+    private GameState alphabeta(GameState state) {
+    	Vector<GameState> nextStates = new Vector<>();
+    	int v = Integer.MIN_VALUE;
+    	GameState choice = new GameState(state, new Move());
+    	
+    	// fill next states
+    	state.findPossibleMoves(nextStates);
+    	
+    	// no possible moves, pass
+    	if (state.isEOG())
+    		return choice;
 
-        Vector<GameState> lNextStates = new Vector<GameState>();
-        pState.findPossibleMoves(lNextStates);
-
-        if (lNextStates.size() == 0) {
-            // Must play "pass" move if there are no other moves possible.
-            return new GameState(pState, new Move());
-        }
-
-	    /**
-	     * Here you should write your algorithms to get the best next move, i.e.
-	     * the best next state. This skeleton returns a random move instead.
-	     */
-	    
-	    int state = -1;
-	    int v = Integer.MIN_VALUE;
-	    int aux = 0;
-	    int i = 0;
-	    //Store the maximum value of the branches
-	    for (GameState child : lNextStates) {
-	        aux = alphabeta(child, depth, Integer.MIN_VALUE, Integer.MAX_VALUE);
-	        if (aux > v) {
-	            v = aux;
-	            state = i;
-	        }
-	        i++;
-	    }	    
-		return lNextStates.elementAt(state);
+    	// iterative deepening
+    	maxDepth = 0;
+    	timeout = false;
+    	bestPath.clear();
+    	while (!timeout) {
+    		//Re-initialize HashMaps
+    		redStates = new HashMap<String, Integer>();
+    		whiteStates = new HashMap<String, Integer>();
+    		currentPlayerStates = (whoAmI == Constants.CELL_RED ? redStates : whiteStates);
+    		otherPlayerStates = (whoAmI == Constants.CELL_RED ? whiteStates : redStates);
+    		// save result of the previous completed iteration
+    		if (!bestPath.isEmpty())
+    			choice = bestPath.lastElement();
+    		
+    		// prepare new iteration
+    		maxDepth++;
+    		bestPath.add(0, null);	// shift other elements to right, new position for the new step in depth
+    		
+    		// move ordering
+    		moveOrdering(nextStates, maxDepth);
+    		
+    		// find action maximizing the "utility"
+        	for (int i=0; i<nextStates.size() && !timeout; i++) {
+        		GameState s = nextStates.elementAt(i);
+        		int tmp = alphabetaR(s, maxDepth-1, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        		if (tmp > v) {
+        			v = tmp;	// max
+        			bestPath.setElementAt(s, maxDepth-1);	// argmax
+        		}
+        	}
+    	}
+    	
+    	return choice;
     }
     
     /**
@@ -137,18 +155,9 @@ public class Player {
     	key = makeKey(state);
     	currentPlayerStates.put(key, value);
     	otherPlayerStates.put(key, -value);
-    	//Compute the key of the symmetric state
-    	key = getSymmetricState(key);
+    	/*//Compute the key of the opposed state;
     	currentPlayerStates.put(key, value);
-    	otherPlayerStates.put(key, -value);
-    	//Compute the key of the opposed of the symmetric state (in which value is -value)
-    	key = getOpposedState(key);
-    	currentPlayerStates.put(key, -value);
-    	otherPlayerStates.put(key, value);
-    	//Compute the key of the opposed state (in which value is -value)
-    	key = getSymmetricState(key);
-    	currentPlayerStates.put(key, -value);
-    	otherPlayerStates.put(key, value);
+    	otherPlayerStates.put(key, -value);*/
     }
     
     /**
@@ -158,10 +167,20 @@ public class Player {
      * @return The key to Hash the provided GameState
      */
     private String makeKey(GameState state) {
-    	String key = state.toMessage();
-    	String[] parts = key.split(" ");
-    	//Only depends on position of the pieces and the player
-    	key = parts[0] + " " + parts[2];
+    	String key = "";
+    	for (int i = 0; i < 8; i++) {
+    		int count = 4;
+    		for (int j = 0; j < 4; j++) {
+    			int piece = state.get(GameState.rowColToCell(i, j));
+    			if ((piece & Constants.CELL_RED) != 0)
+    				count += 1;
+    			else if ((piece & Constants.CELL_WHITE) != 0)
+    				count -=1;
+    				
+    		}
+    		key += count;
+    	}
+    	System.err.println(key);
     	return key;
     }
     
@@ -171,18 +190,17 @@ public class Player {
      * @return
      */
     private String getSymmetricState(String state) {
-    	String[] parts = state.split(" ");
-    	String result = "", player = parts[1];
+    	String result = "";
     	int i, j;
     	char c;
     	for (i = 0; i < 8; i++) {
     		//Only the order of columns changes
     		for (j = 3; j >= 0; j--) {
-    			c = parts[0].charAt(i*4 + j);
+    			c = state.charAt(GameState.rowColToCell(i, j));
     			result += c;
     		}
     	}
-    	return result + " " + player;
+    	return result;
     }
     
     /**
@@ -191,14 +209,13 @@ public class Player {
      * @return
      */
     private String getOpposedState(String state) {
-    	String[] parts = state.split(" ");
-    	String result = "", player = parts[1];
+    	String result = "";
     	int i, j;
     	char c;
     	//Beginning from bottom-right, we fill the contrary piece on top-left, to create the opposed state
     	for (i = 7; i >= 0; i--) {
     		for (j = 3; j >= 0; j--) {
-    			c = parts[0].charAt(i * 4 + j);
+    			c = state.charAt(GameState.rowColToCell(i, j));
     			if (c == 'r') c = 'w';
     			else if (c == 'R') c = 'W';
     			else if (c == 'w') c = 'r';
@@ -206,9 +223,7 @@ public class Player {
     			result += c;
     		}
     	}
-    	//We also invert the player
-    	player = player == "r" ? "w" : "r";
-    	return result + " " + player;
+    	return result;
     }
     
     private int eval (GameState state) {
@@ -217,17 +232,15 @@ public class Player {
     	int i;
     	int piece;
     	
-    	boolean amIRed = compare(myPlayer, Constants.CELL_RED);
-    	if (state.isRedWin() && amIRed)
-    		return Integer.MAX_VALUE;
-    	else if (state.isRedWin() && !amIRed)
-    		return Integer.MIN_VALUE + 1;
-    	else if (state.isWhiteWin() && amIRed)
-    		return Integer.MIN_VALUE + 1;
-    	else if (state.isWhiteWin() && !amIRed)
-    		return Integer.MAX_VALUE;
-    	else if (state.isDraw())
-    		return 0;
+    	// terminal state, the result is certain
+    	if (state.isEOG()) {
+    		if (isWin(state))
+    			return Integer.MAX_VALUE;
+    		else if (isLoss(state))
+    			return Integer.MIN_VALUE + 1;
+    		else
+    			return 0;	// draw
+    	}
     	
     	myPartialSum = othersPartialSum = 0; 
     	for (i = 0; i < GameState.NUMBER_OF_SQUARES; i++) {
