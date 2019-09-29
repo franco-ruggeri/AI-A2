@@ -21,6 +21,7 @@ public class Player {
      */
     public GameState play(final GameState pState, final Deadline pDue) {
         whoAmI = pState.getNextPlayer();
+        System.err.println("I am " + whoAmI);
         deadline = pDue;
         return alphabeta(pState);
     }
@@ -40,6 +41,7 @@ public class Player {
     	// iterative deepening
     	maxDepth = 0;
     	timeout = false;
+    	bestPath.clear();
     	while (!timeout) {
     		// save result of the previous completed iteration
     		if (!bestPath.isEmpty())
@@ -50,7 +52,8 @@ public class Player {
     		bestPath.add(0, null);	// shift other elements to right, new position for the new step in depth
     		
     		// move ordering
-    		moveOrdering(nextStates, maxDepth);
+    		if (maxDepth > 1)
+    			moveOrdering(nextStates, maxDepth);
     		
     		// find action maximizing the "utility"
         	for (int i=0; i<nextStates.size() && !timeout; i++) {
@@ -62,6 +65,9 @@ public class Player {
         		}
         	}
     	}
+    	
+    	if (choice.getMove().isBOG())
+    		System.err.println("Cazzo");
     	
     	return choice;
     }
@@ -80,15 +86,16 @@ public class Player {
     	// fill next states
     	state.findPossibleMoves(nextStates);
     	
-    	// move ordering
-    	moveOrdering(nextStates, depth);
-    	
     	// cutoff test
-    	if (depth == 0 || nextStates.isEmpty()) {
-    		v = evaluate(state);
-    	}
+    	if (depth == 0 || nextStates.isEmpty())
+    		return evaluate(state);
+    	
+    	// move ordering
+    	if (depth > 1)
+    		moveOrdering(nextStates, depth);
+    	
     	// it's me, I look for the maximum
-    	else if (player == whoAmI) {
+    	if (player == whoAmI) {
     		v = Integer.MIN_VALUE;
     		for (GameState s : nextStates) {
     			int tmp = alphabetaR(s, depth-1, alpha, beta);
@@ -134,7 +141,7 @@ public class Player {
     	int i;
     	int pos;
     	
-    	partialSum = 0; 
+    	partialSum = 0;
     	for (i = 0; i < GameState.NUMBER_OF_SQUARES; i++) {
     		pos = state.get(i);
     		if (compare(pos, Constants.CELL_RED)) {
@@ -173,17 +180,17 @@ public class Player {
     	/*
 		 * Move ordering:
 		 * 1. use the best move of the previous iteration as first
-		 * 2a. order the other moves this way: jump, normal
+		 * 2a. order the other moves this way: become king, jump, normal
 		 * 2b. shuffle the other moves (random, O(b^3*m/4), see book)
 		 * 
-		 * TODO: try 2b
+		 * TODO: try 2b, priviledge to becoming king
 		 */
     	GameState bestNextState = bestPath.elementAt(depth-1);
     	Collections.sort(nextStates, (GameState s1, GameState s2) -> {
 			Move m1 = s1.getMove();
 			Move m2 = s2.getMove();
 			int result;
-
+			
 			if (s1.toMessage().equals(bestNextState.toMessage()))
 				result = 1;
 			else if (s2.toMessage().equals(bestNextState.toMessage()))
