@@ -7,7 +7,7 @@ public class Player {
 	private Deadline deadline;
 	private int maxDepth;		// current iteration (iterative deepening)
 	private boolean timeout;	// set to true when deadline is almost reached
-	private Vector<GameState> bestPath = new Vector<>();	// for move ordering
+	private Vector<String> bestPath = new Vector<>();	// for move ordering
 	
 	//Hash map with the heuristics for Red Player
 	private HashMap<String, Integer> redStates = new HashMap<>();
@@ -45,14 +45,15 @@ public class Player {
     private GameState alphabeta(GameState state) {
     	Vector<GameState> nextStates = new Vector<>();
     	int v = Integer.MIN_VALUE;
-    	GameState choice = new GameState(state, new Move());
+    	GameState finalChoice = new GameState(state, new Move());
+    	GameState tmpChoice = new GameState(state, new Move()); 
     	
     	// fill next states
     	state.findPossibleMoves(nextStates);
     	
     	// no possible moves, pass
     	if (state.isEOG())
-    		return choice;
+    		return finalChoice;
 
     	// iterative deepening
     	maxDepth = 0;
@@ -60,8 +61,7 @@ public class Player {
     	bestPath.clear();
     	while (!timeout) {
     		// save result of the previous completed iteration
-    		if (!bestPath.isEmpty())
-    			choice = bestPath.lastElement();
+    		finalChoice = tmpChoice;
     		
     		// prepare new iteration
     		maxDepth++;
@@ -75,13 +75,15 @@ public class Player {
         		GameState s = nextStates.elementAt(i);
         		int tmp = alphabetaR(s, maxDepth-1, Integer.MIN_VALUE, Integer.MAX_VALUE);
         		if (tmp > v) {
-        			v = tmp;	// max
-        			bestPath.setElementAt(s, maxDepth-1);	// argmax
+        			v = tmp;		// max
+        			tmpChoice = s;	// argmax
+        			// save best move for move ordering at the next iteration
+        			bestPath.setElementAt(makeKey(s), maxDepth-1);
         		}
         	}
     	}
     	
-    	return choice;
+    	return finalChoice;
     }
     
     private int alphabetaR(GameState state, int depth, int alpha, int beta) {
@@ -125,7 +127,7 @@ public class Player {
     			if (tmp > v) {
     				v = tmp;
     				// save best move for move ordering at the next iteration
-    				bestPath.setElementAt(s, depth-1);
+    				bestPath.setElementAt(makeKey(s), depth-1);
     			}
     			if (tmp > alpha)
     				alpha = tmp;
@@ -143,7 +145,7 @@ public class Player {
     			if (tmp < v) {
     				v = tmp;
     				// save best move for move ordering at the next iteration
-    				bestPath.setElementAt(s, depth-1);
+    				bestPath.setElementAt(makeKey(s), depth-1);
     			}
     			if (tmp < beta)
     				beta = tmp;
@@ -291,17 +293,12 @@ public class Player {
      * @param piece
      * @return
      */
-    private int getRelativeRow(int piece, int position) {
-    	if (compare(piece,Constants.CELL_RED))
-    		return GameState.cellToRow(position);
-    	else
-    		return 7 - GameState.cellToRow(position);
-    }
-    
-    private boolean compare(int a, int b) {
-    	boolean v = (a&b) != 0;
-    	return v;
-    }
+//    private int getRelativeRow(int piece, int position) {
+//    	if ((piece & Constants.CELL_RED) != 0)
+//    		return GameState.cellToRow(position);
+//    	else
+//    		return 7 - GameState.cellToRow(position);
+//    }
     
     private boolean isWin(GameState state) {
     	return (whoAmI == Constants.CELL_RED && state.isRedWin()) ||
@@ -318,11 +315,11 @@ public class Player {
     }
     
     private void moveOrdering(Vector<GameState> nextStates, int depth) {
-    	GameState bestNextState = depth > 0 ? bestPath.elementAt(depth-1) : null;
+    	String bestNextState = depth > 0 ? bestPath.elementAt(depth-1) : null;
     	Vector<GameState> states1, states2, states3, states4, states5;
     	Predicate<GameState> filter1, filter2, filter3;
     	
-    	filter1 = s -> s.equals(bestNextState);	// best move
+    	filter1 = s -> s.toMessage().equals(bestNextState);	// best move
     	filter2 = s -> s.getMove().isJump();	// jump move
     	filter3 = s -> isBecomingKing(s);		// become king
 
@@ -330,22 +327,27 @@ public class Player {
 		states1 = nextStates.stream()
 				.filter(filter1)
 				.collect(Collectors.toCollection(Vector::new));
+		Collections.shuffle(states1);
     	// second: jump moves for which the piece becomes king
     	states2 = nextStates.stream()
     			.filter(filter1.negate().and(filter2).and(filter3))
     			.collect(Collectors.toCollection(Vector::new));
+    	Collections.shuffle(states2);
     	// third: the rest of the jump moves
     	states3 = nextStates.stream()
     			.filter(filter1.negate().and(filter2).and(filter3.negate()))
     			.collect(Collectors.toCollection(Vector::new));
-    	// forth: normal moves for which the piece becomes king
+    	Collections.shuffle(states3);
+    	// fourth: normal moves for which the piece becomes king
     	states4 = nextStates.stream()
     			.filter(filter1.negate().and(filter2.negate()).and(filter3))
     			.collect(Collectors.toCollection(Vector::new));
-    	// forth: the rest of the normal moves
+    	Collections.shuffle(states4);
+    	// fifth: the rest of the normal moves
     	states5 = nextStates.stream()
     			.filter(filter1.negate().and(filter2.negate()).and(filter3.negate()))
     			.collect(Collectors.toCollection(Vector::new));
+    	Collections.shuffle(states5);
     	
     	nextStates.clear();
     	nextStates.addAll(states1);
@@ -353,8 +355,6 @@ public class Player {
     	nextStates.addAll(states3);
     	nextStates.addAll(states4);
     	nextStates.addAll(states5);
-    	
-    	// TODO: try to shuffle instead of ordering, O(b^3m/4), see book
     }
     
     private boolean isBecomingKing(GameState state) {

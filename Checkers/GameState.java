@@ -50,7 +50,6 @@ public class GameState {
   private int mMovesUntilDraw;
   private int mNextPlayer;
   private Move mLastMove;
-  private String key;
 
   /**
    * Initialises the board to the starting position.
@@ -72,8 +71,6 @@ public class GameState {
     this.mLastMove = new Move(Move.MOVE_BOG);
     this.mMovesUntilDraw = GameState.MOVES_UNTIL_DRAW;
     this.mNextPlayer = Constants.CELL_RED;
-    
-    this.key = makeKey();
   }
 
   /**
@@ -138,8 +135,6 @@ public class GameState {
 
     // Set number of moves left until draw
     this.mMovesUntilDraw = moves_left;
-    
-    this.key = makeKey();
   }
 
   /**
@@ -161,8 +156,6 @@ public class GameState {
 
     /* Perform move */
     this.doMove(pMove);
-    
-    this.key = makeKey();
   }
 
   /**
@@ -754,34 +747,4 @@ public class GameState {
   boolean isDraw() {
     return mLastMove.isDraw();
   }
-  
-  /**
-   * Creates the key for the HashTable of given GameState.
-   * Key only depends on the position of the pieces and the player.
-   * 
-   * @param state
-   * @return The key to Hash the provided GameState
-   */
-  private String makeKey() {
-	String[] parts = this.toMessage().split(" ");
-	return parts[0] + " " + parts[2];	// only pieces and player
-  }
-
-  @Override
-  public int hashCode() {
-	return this.key.hashCode();
-  }
-	
-  @Override
-  public boolean equals(Object obj) {
-	if (this == obj)
-		return true;
-	if (obj == null)
-		return false;
-	if (getClass() != obj.getClass())
-		return false;
-	GameState other = (GameState) obj;
-	return this.key.equals(other.key);
-  }
-  
 }
