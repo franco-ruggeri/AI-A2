@@ -7,8 +7,8 @@ public class Player {
 	private boolean timeout;	// set to true when deadline is almost reached
 	private Vector<GameState> bestPath = new Vector<>();		// for move ordering
 	
-	private static final long MARGIN_DEADLINE = (long) 1e8;	// 100 ms (10000000 ns) of margin
-	private static final long TIME_TO_RETURN = (long) 1e5;	// 0.1 ms (100000 ns) to return 1 level up in the recursion
+	private static final long MARGIN_DEADLINE = (long) (5*1e7);	// 50 ms (5000000 ns) of margin
+	private static final long TIME_TO_RETURN = (long) 1e5;		// 0.1 ms (100000 ns) to return 1 level up in recursion
 	
     /**
      * Performs a move
@@ -17,7 +17,7 @@ public class Player {
      *            the current state of the board
      * @param pDue
      *            time before which we must have returned
-     * @return the next state the boaorderingrd is in after our move
+     * @return the next state the board is in after our move
      */
     public GameState play(final GameState pState, final Deadline pDue) {
         whoAmI = pState.getNextPlayer();
@@ -131,7 +131,7 @@ public class Player {
     }
     
     private int evaluate(GameState state) {
-    	// TODO: improve
+    	// TODO: improve considering jumps
     	
     	int globalSum = 0;
     	int partialSum;
@@ -153,14 +153,14 @@ public class Player {
     		pos = state.get(i);
     		if ((pos & whoAmI) != 0) {
     			if ((pos & Constants.CELL_KING) != 0) {
-    				partialSum += 10;
+    				partialSum += 2;
     			} else {
     				partialSum += 1; //GameState.cellToRow(i);
 //    				partialSum *= Math.abs(partialSum);
     			}
     		} else {
     			if ((pos & Constants.CELL_KING) != 0) {
-    				partialSum -= 10;
+    				partialSum -= 2;
     			} else {    				
     				partialSum -= 1; //7 - GameState.cellToRow(i);
 //    				partialSum *= Math.abs(partialSum);
@@ -192,18 +192,24 @@ public class Player {
 		 * 1. use the best move of the previous iteration as first
 		 * 2a. order the other moves this way: becoming king, jump, normal
 		 * 2b. shuffle the other moves (random, O(b^3*m/4), see book)
-		 * 
-		 * TODO: try 2b, privilege to becoming king
 		 */
     	GameState bestNextState = bestPath.elementAt(depth-1);
     	Collections.sort(nextStates, (s1, s2) -> {
 			Move m1 = s1.getMove();
 			Move m2 = s2.getMove();
+			boolean isBecomingKing1 = isBecomingKing(s1);
+			boolean isBecomingKing2 = isBecomingKing(s2);
 			int result;
 			
+			// 1
 			if (s1.toMessage().equals(bestNextState.toMessage()))
 				result = 1;
 			else if (s2.toMessage().equals(bestNextState.toMessage()))
+				result = -1;
+			// 2a
+			else if (isBecomingKing1 && !isBecomingKing2)
+				result = 1;
+			else if (isBecomingKing2 && !isBecomingKing1)
 				result = -1;
 			else if (m1.isJump() && m2.isNormal())
 				result = 1;
@@ -211,8 +217,16 @@ public class Player {
 				result = -1;
 			else
 				result = 0;
+			// 2b
+//			else
+//				result = (int) (Math.random() * 2.0 - 1);
 		
 			return result;
 		});
+    }
+    
+    private boolean isBecomingKing(GameState state) {
+    	Move m = state.getMove();
+    	return (state.get(m.at(m.length()-1)) & Constants.CELL_KING) != 0;
     }
 }
