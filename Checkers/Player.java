@@ -207,15 +207,15 @@ public class Player {
     		piece = state.get(i);
     		if (compare(piece, myPlayer)) {
     			if (compare(piece, Constants.CELL_KING)) {
-    				myPartialSum += 10;
+    				myPartialSum += 5;
     			} else {    				
-    				myPartialSum += getRelativeRow(piece, i);
+    				myPartialSum += 1; //getRelativeRow(piece, i);
     			}
     		} else if (compare(piece, otherPlayer)) {
     			if (compare(piece, Constants.CELL_KING)) {
-    				othersPartialSum += 10;
+    				othersPartialSum += 5;
     			} else {    				
-    				othersPartialSum += getRelativeRow(piece, i);
+    				othersPartialSum += 1; //getRelativeRow(piece, i);
 				}
     		}
     	}
