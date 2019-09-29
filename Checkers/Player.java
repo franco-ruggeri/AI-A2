@@ -6,16 +6,20 @@ public class Player {
 	
 	private int myPlayer, otherPlayer; 
 	
+	//Hash map with the heuristics for Red Player
 	private HashMap<String, Integer> redStates;
+	//Hash map with the heuristics for White Player
 	private HashMap<String, Integer> whiteStates;
+	//Hash map with the heuristics for the current player (It will point to redStates or whiteStates)
 	private HashMap<String, Integer> currentPlayerStates;
+	//Hash map with the heuristics for the other player (It will point to redStates or whiteStates)
 	private HashMap<String, Integer> otherPlayerStates;
 
 		
 	public Player() {
+		//Initialize the HashMaps
 		redStates = new HashMap<String, Integer>();
 		whiteStates = new HashMap<String, Integer>();
-		System.err.println("Inicializado");
 	}
 		
     /**
@@ -28,10 +32,13 @@ public class Player {
      * @return the next state the board is in after our move
      */
     public GameState play(final GameState pState, final Deadline pDue) {
-    	
+    	//Assign which player I am 
     	myPlayer = pState.getNextPlayer();
+    	//Assign which player the other is
     	otherPlayer = (compare(myPlayer,Constants.CELL_RED) ? Constants.CELL_WHITE : Constants.CELL_RED);
+    	//Assign which my current HashTable is
     	currentPlayerStates = (compare(myPlayer,Constants.CELL_RED) ? redStates : whiteStates);
+    	//Assign which the other's HashTable is
     	otherPlayerStates = (compare(myPlayer,Constants.CELL_RED) ? whiteStates : redStates);
 
         Vector<GameState> lNextStates = new Vector<GameState>();
@@ -51,8 +58,9 @@ public class Player {
 	    int v = Integer.MIN_VALUE;
 	    int aux = 0;
 	    int i = 0;
+	    //Store the maximum value of the branches
 	    for (GameState child : lNextStates) {
-	        aux = alphabeta(child, depth, Integer.MIN_VALUE, Integer.MAX_VALUE, pDue);
+	        aux = alphabeta(child, depth, Integer.MIN_VALUE, Integer.MAX_VALUE);
 	        if (aux > v) {
 	            v = aux;
 	            state = i;
@@ -62,12 +70,23 @@ public class Player {
 		return lNextStates.elementAt(state);
     }
     
-    private int alphabeta (GameState state, int depth, double alpha, double beta, Deadline deadline) {
+    /**
+     * 
+     * @param state The current GameState state
+     * @param depth The remaining depth to dive in
+     * @param alpha Current alpha value
+     * @param beta Current beta value
+     * @return The value of the current state node
+     */
+    private int alphabeta (GameState state, int depth, double alpha, double beta) {
+    	//We retrieve the stored value for this node
     	Integer stored = currentPlayerStates.get(makeKey(state));
+    	//If we have something stored, we return that value
     	if (stored != null) {
     		return stored;
     	}
-    	
+    	//If we have ran out of depth or the state is End Of Game, 
+    	//we compute the value for that specific node, and we add it to the HashMap
         if (depth == 0 || state.isEOG()) {
         	int value = eval (state);
         	addToHash(state, value);
@@ -83,7 +102,7 @@ public class Player {
         if (compare(myPlayer,player)) {
             v = Integer.MIN_VALUE;
             for(GameState child : nextStates) {
-                v = Math.max(v, alphabeta(child, depth-1, alpha, beta, deadline));
+                v = Math.max(v, alphabeta(child, depth-1, alpha, beta));
                 alpha = Math.max(alpha, v);
                 if (beta <= alpha) {
                     return v;
@@ -94,7 +113,7 @@ public class Player {
         else {
             v = Integer.MAX_VALUE;
             for (GameState child: nextStates) {
-                v = Math.min(v, alphabeta(child, depth-1, alpha, beta, deadline));
+                v = Math.min(v, alphabeta(child, depth-1, alpha, beta));
                 beta = Math.min(beta, v);
                 if (beta <= alpha) {
                     return v;
@@ -102,6 +121,7 @@ public class Player {
 
             }
         }
+        //We finally add to the HashMap the value of that node
         addToHash(state, v);
         return v;
     }
@@ -113,15 +133,19 @@ public class Player {
      */
     private void addToHash(GameState state, int value) {
     	String key = "";
+    	//Compute the key corresponding to given state
     	key = makeKey(state);
     	currentPlayerStates.put(key, value);
     	otherPlayerStates.put(key, -value);
+    	//Compute the key of the symmetric state
     	key = getSymmetricState(key);
     	currentPlayerStates.put(key, value);
     	otherPlayerStates.put(key, -value);
+    	//Compute the key of the opposed of the symmetric state (in which value is -value)
     	key = getOpposedState(key);
     	currentPlayerStates.put(key, -value);
     	otherPlayerStates.put(key, value);
+    	//Compute the key of the opposed state (in which value is -value)
     	key = getSymmetricState(key);
     	currentPlayerStates.put(key, -value);
     	otherPlayerStates.put(key, value);
@@ -152,6 +176,7 @@ public class Player {
     	int i, j;
     	char c;
     	for (i = 0; i < 8; i++) {
+    		//Only the order of columns changes
     		for (j = 3; j >= 0; j--) {
     			c = parts[0].charAt(i*4 + j);
     			result += c;
@@ -170,6 +195,7 @@ public class Player {
     	String result = "", player = parts[1];
     	int i, j;
     	char c;
+    	//Beginning from bottom-right, we fill the contrary piece on top-left, to create the opposed state
     	for (i = 7; i >= 0; i--) {
     		for (j = 3; j >= 0; j--) {
     			c = parts[0].charAt(i * 4 + j);
@@ -180,6 +206,7 @@ public class Player {
     			result += c;
     		}
     	}
+    	//We also invert the player
     	player = player == "r" ? "w" : "r";
     	return result + " " + player;
     }
