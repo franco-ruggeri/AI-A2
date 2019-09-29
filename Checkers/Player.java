@@ -327,7 +327,6 @@ public class Player {
     	filter3 = s -> isBecomingKing(s);		// become king
 
     	// first: best move from previous iteration
-    	filter1 = s -> s.equals(bestNextState);
 		states1 = nextStates.stream()
 				.filter(filter1)
 				.collect(Collectors.toCollection(Vector::new));
