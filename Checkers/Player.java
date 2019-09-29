@@ -66,6 +66,10 @@ public class Player {
     		// prepare new iteration
     		maxDepth++;
     		bestPath.add(0, null);	// shift other elements to right, new position for the new step in depth
+    		redStates = new HashMap<String, Integer>();
+    		whiteStates = new HashMap<String, Integer>();
+    		currentPlayerStates = (whoAmI == Constants.CELL_RED ? redStates : whiteStates);
+    		otherPlayerStates = (whoAmI == Constants.CELL_RED ? whiteStates : redStates);
     		
     		// move ordering
     		moveOrdering(nextStates, maxDepth);
