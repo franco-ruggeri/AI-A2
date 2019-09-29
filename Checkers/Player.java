@@ -1,4 +1,6 @@
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class Player {
 	private int whoAmI;
@@ -34,7 +36,7 @@ public class Player {
     	state.findPossibleMoves(nextStates);
     	
     	// no possible moves, pass
-    	if (nextStates.isEmpty())
+    	if (state.isEOG())
     		return new GameState(state, new Move());
 
     	// iterative deepening
@@ -51,8 +53,7 @@ public class Player {
     		bestPath.add(0, null);	// shift other elements to right, new position for the new step in depth
     		
     		// move ordering
-    		if (maxDepth > 1)
-    			moveOrdering(nextStates, maxDepth);
+    		moveOrdering(nextStates, maxDepth);
     		
     		// find action maximizing the "utility"
         	for (int i=0; i<nextStates.size() && !timeout; i++) {
@@ -87,8 +88,7 @@ public class Player {
     		return evaluate(state);
     	
     	// move ordering
-    	if (depth > 1)
-    		moveOrdering(nextStates, depth);
+    	moveOrdering(nextStates, depth);
     	
     	// it's me, I look for the maximum
     	if (player == whoAmI) {
@@ -187,46 +187,51 @@ public class Player {
     }
     
     private void moveOrdering(Vector<GameState> nextStates, int depth) {
-    	/*
-		 * Move ordering:
-		 * 1. use the best move of the previous iteration as first
-		 * 2a. order the other moves this way: becoming king, jump, normal
-		 * 2b. shuffle the other moves (random, O(b^3*m/4), see book)
-		 */
-    	GameState bestNextState = bestPath.elementAt(depth-1);
-    	Collections.sort(nextStates, (s1, s2) -> {
-			Move m1 = s1.getMove();
-			Move m2 = s2.getMove();
-			boolean isBecomingKing1 = isBecomingKing(s1);
-			boolean isBecomingKing2 = isBecomingKing(s2);
-			int result;
-			
-			// 1
-			if (s1.toMessage().equals(bestNextState.toMessage()))
-				result = 1;
-			else if (s2.toMessage().equals(bestNextState.toMessage()))
-				result = -1;
-			// 2a
-			else if (isBecomingKing1 && !isBecomingKing2)
-				result = 1;
-			else if (isBecomingKing2 && !isBecomingKing1)
-				result = -1;
-			else if (m1.isJump() && m2.isNormal())
-				result = 1;
-			else if (m1.isNormal() && m2.isJump())
-				result = -1;
-			else
-				result = 0;
-			// 2b
-//			else
-//				result = (int) (Math.random() * 2.0 - 1);
-		
-			return result;
-		});
+    	GameState bestNextState = depth > 0 ? bestPath.elementAt(depth-1) : null;
+    	Vector<GameState> states1, states2, states3, states4, states5;
+    	Predicate<GameState> filter1, filter2, filter3;
+    	
+    	filter1 = s -> s.equals(bestNextState);	// best move
+    	filter2 = s -> s.getMove().isJump();	// jump move
+    	filter3 = s -> isBecomingKing(s);		// become king
+
+    	// first: best move from previous iteration
+    	filter1 = s -> s.equals(bestNextState);
+		states1 = nextStates.stream()
+				.filter(filter1)
+				.collect(Collectors.toCollection(Vector::new));
+    	// second: jump moves for which the piece becomes king
+    	states2 = nextStates.stream()
+    			.filter(filter1.negate().and(filter2).and(filter3))
+    			.collect(Collectors.toCollection(Vector::new));
+    	// third: the rest of the jump moves
+    	states3 = nextStates.stream()
+    			.filter(filter1.negate().and(filter2).and(filter3.negate()))
+    			.collect(Collectors.toCollection(Vector::new));
+    	// forth: normal moves for which the piece becomes king
+    	states4 = nextStates.stream()
+    			.filter(filter1.negate().and(filter2.negate()).and(filter3))
+    			.collect(Collectors.toCollection(Vector::new));
+    	// forth: the rest of the normal moves
+    	states5 = nextStates.stream()
+    			.filter(filter1.negate().and(filter2.negate()).and(filter3.negate()))
+    			.collect(Collectors.toCollection(Vector::new));
+    	
+    	nextStates.clear();
+    	nextStates.addAll(states1);
+    	nextStates.addAll(states2);
+    	nextStates.addAll(states3);
+    	nextStates.addAll(states4);
+    	nextStates.addAll(states5);
+    	
+    	// TODO: try to shuffle instead of ordering, O(b^3m/4), see book
     }
     
     private boolean isBecomingKing(GameState state) {
     	Move m = state.getMove();
-    	return (state.get(m.at(m.length()-1)) & Constants.CELL_KING) != 0;
+    	int length = m.length();
+    	if (length == 0)
+    		return false;
+    	return (state.get(m.at(length-1)) & Constants.CELL_KING) != 0;
     }
 }
