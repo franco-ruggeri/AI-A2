@@ -5,9 +5,9 @@ public class Player {
 	private Deadline deadline;
 	private int maxDepth;		// current iteration (iterative deepening)
 	private boolean timeout;	// set to true when deadline is almost reached
-	private Vector<GameState> bestPath = new Vector<>();	// for move ordering
+	private Vector<GameState> bestPath = new Vector<>();		// for move ordering
 	
-	private static final long MARGIN_DEADLINE = (long) 1e7;	// 10 ms (10000000 ns) of margin
+	private static final long MARGIN_DEADLINE = (long) 1e8;	// 100 ms (10000000 ns) of margin
 	private static final long TIME_TO_RETURN = (long) 1e5;	// 0.1 ms (100000 ns) to return 1 level up in the recursion
 	
     /**
@@ -21,7 +21,6 @@ public class Player {
      */
     public GameState play(final GameState pState, final Deadline pDue) {
         whoAmI = pState.getNextPlayer();
-        System.err.println("I am " + whoAmI);
         deadline = pDue;
         return alphabeta(pState);
     }
@@ -65,9 +64,6 @@ public class Player {
         		}
         	}
     	}
-    	
-    	if (choice.getMove().isBOG())
-    		System.err.println("Cazzo");
     	
     	return choice;
     }
@@ -136,57 +132,71 @@ public class Player {
     
     private int evaluate(GameState state) {
     	// TODO: improve
+    	
     	int globalSum = 0;
     	int partialSum;
     	int i;
     	int pos;
     	
+    	// terminal state, the result is certain
+    	if (state.isEOG()) {
+    		if (isWin(state))
+    			return Integer.MAX_VALUE;
+    		else if (isLoss(state))
+    			return Integer.MIN_VALUE;
+    		else
+    			return 0;	// draw
+    	}
+    	
     	partialSum = 0;
     	for (i = 0; i < GameState.NUMBER_OF_SQUARES; i++) {
     		pos = state.get(i);
-    		if (compare(pos, Constants.CELL_RED)) {
-    			if (compare(pos, Constants.CELL_KING)) {
+    		if ((pos & whoAmI) != 0) {
+    			if ((pos & Constants.CELL_KING) != 0) {
     				partialSum += 10;
-    			} else {    				
+    			} else {
     				partialSum += 1; //GameState.cellToRow(i);
-    				partialSum *= Math.abs(partialSum);
+//    				partialSum *= Math.abs(partialSum);
     			}
-    		} else if (compare(pos, Constants.CELL_WHITE)) {
-    			if (compare(pos, Constants.CELL_KING)) {
+    		} else {
+    			if ((pos & Constants.CELL_KING) != 0) {
     				partialSum -= 10;
     			} else {    				
     				partialSum -= 1; //7 - GameState.cellToRow(i);
-    				partialSum *= Math.abs(partialSum);
+//    				partialSum *= Math.abs(partialSum);
     			}
     		}
     	}
     	globalSum += partialSum;
-    	    	
-    	globalSum *= compare(whoAmI, Constants.CELL_RED) ? -1 : 1;
     	
     	return globalSum;
     }
     
-    private boolean compare(int a, int b) {
-    	boolean v = (a&b) != 0;
-    	return v;
+    private boolean isWin(GameState state) {
+    	return (whoAmI == Constants.CELL_RED && state.isRedWin()) ||
+    			(whoAmI == Constants.CELL_WHITE && state.isWhiteWin());
+    }
+    
+    private boolean isLoss(GameState state) {
+    	return (whoAmI == Constants.CELL_RED && state.isWhiteWin()) ||
+    			(whoAmI == Constants.CELL_WHITE && state.isRedWin());
     }
     
     private boolean timeout(int depth) {
     	return deadline.timeUntil() <= MARGIN_DEADLINE + TIME_TO_RETURN*depth;
     }
     
-    private void moveOrdering(List<GameState> nextStates, int depth) {
+    private void moveOrdering(Vector<GameState> nextStates, int depth) {
     	/*
 		 * Move ordering:
 		 * 1. use the best move of the previous iteration as first
-		 * 2a. order the other moves this way: become king, jump, normal
+		 * 2a. order the other moves this way: becoming king, jump, normal
 		 * 2b. shuffle the other moves (random, O(b^3*m/4), see book)
 		 * 
-		 * TODO: try 2b, priviledge to becoming king
+		 * TODO: try 2b, privilege to becoming king
 		 */
     	GameState bestNextState = bestPath.elementAt(depth-1);
-    	Collections.sort(nextStates, (GameState s1, GameState s2) -> {
+    	Collections.sort(nextStates, (s1, s2) -> {
 			Move m1 = s1.getMove();
 			Move m2 = s2.getMove();
 			int result;
