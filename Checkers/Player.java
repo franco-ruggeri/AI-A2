@@ -9,17 +9,17 @@ public class Player {
 	private boolean timeout;	// set to true when deadline is almost reached
 	private Vector<String> bestPath = new Vector<>();	// for move ordering
 	
-	//Hash map with the heuristics for Red Player
-	private HashMap<String, Integer> redStates = new HashMap<>();
-	//Hash map with the heuristics for White Player
-	private HashMap<String, Integer> whiteStates = new HashMap<>();
-	//Hash map with the heuristics for the current player (It will point to redStates or whiteStates)
-	private HashMap<String, Integer> currentPlayerStates;
-	//Hash map with the heuristics for the other player (It will point to redStates or whiteStates)
-	private HashMap<String, Integer> otherPlayerStates;
+//	//Hash map with the heuristics for Red Player
+//	private HashMap<String, Integer> redStates = new HashMap<>();
+//	//Hash map with the heuristics for White Player
+//	private HashMap<String, Integer> whiteStates = new HashMap<>();
+//	//Hash map with the heuristics for the current player (It will point to redStates or whiteStates)
+//	private HashMap<String, Integer> currentPlayerStates;
+//	//Hash map with the heuristics for the other player (It will point to redStates or whiteStates)
+//	private HashMap<String, Integer> otherPlayerStates;
 	
-	private static final long MARGIN_DEADLINE = (long) (5*1e7);	// 50 ms (5000000 ns) of margin
-	private static final long TIME_TO_RETURN = (long) 1e5;		// 0.1 ms (100000 ns) to return 1 level up in recursion
+	private static final long MARGIN_DEADLINE = (long) 1e8;	// 100 ms (10000000 ns) of margin
+	private static final long TIME_TO_RETURN = (long) 1e5;	// 0.1 ms (100000 ns) to return 1 level up in recursion
 	
     /**
      * Performs a move
@@ -34,9 +34,9 @@ public class Player {
     	// assign player
     	whoAmI = pState.getNextPlayer();
     	
-    	// assign hash tables
-    	currentPlayerStates = (whoAmI == Constants.CELL_RED ? redStates : whiteStates);
-    	otherPlayerStates = (whoAmI == Constants.CELL_RED ? whiteStates : redStates);
+//    	// assign hash tables
+//    	currentPlayerStates = (whoAmI == Constants.CELL_RED ? redStates : whiteStates);
+//    	otherPlayerStates = (whoAmI == Constants.CELL_RED ? whiteStates : redStates);
     	
         deadline = pDue;
         return alphabeta(pState);
@@ -66,10 +66,10 @@ public class Player {
     		// prepare new iteration
     		maxDepth++;
     		bestPath.add(0, null);	// shift other elements to right, new position for the new step in depth
-    		redStates = new HashMap<String, Integer>();
-    		whiteStates = new HashMap<String, Integer>();
-    		currentPlayerStates = (whoAmI == Constants.CELL_RED ? redStates : whiteStates);
-    		otherPlayerStates = (whoAmI == Constants.CELL_RED ? whiteStates : redStates);
+//    		redStates = new HashMap<String, Integer>();
+//    		whiteStates = new HashMap<String, Integer>();
+//    		currentPlayerStates = (whoAmI == Constants.CELL_RED ? redStates : whiteStates);
+//    		otherPlayerStates = (whoAmI == Constants.CELL_RED ? whiteStates : redStates);
     		
     		// move ordering
     		moveOrdering(nextStates, maxDepth);
@@ -101,12 +101,12 @@ public class Player {
     		return 0;	// end search
     	}
     	
-    	//We retrieve the stored value for this node
-    	Integer stored = currentPlayerStates.get(makeKey(state));
-    	//If we have something stored, we return that value
-    	if (stored != null) {
-    		return stored;
-    	}
+//    	//We retrieve the stored value for this node
+//    	Integer stored = currentPlayerStates.get(makeKey(state));
+//    	//If we have something stored, we return that value
+//    	if (stored != null) {
+//    		return stored;
+//    	}
     	
     	// fill next states
     	state.findPossibleMoves(nextStates);
@@ -114,7 +114,7 @@ public class Player {
     	// cutoff test
     	if (depth == 0 || nextStates.isEmpty()) {
     		v = evaluate(state);
-    		addToHash(state, v);
+//    		addToHash(state, v);
     		return v;
     	}
     	
@@ -158,8 +158,8 @@ public class Player {
     		}
     	}
     	
-    	//We finally add to the HashMap the value of that node
-        addToHash(state, v);
+//    	//We finally add to the HashMap the value of that node
+//        addToHash(state, v);
     	
     	return v;
     }
@@ -169,25 +169,25 @@ public class Player {
      * @param state
      * @param value The value of given GameState
      */
-    private void addToHash(GameState state, int value) {
-    	String key = "";
-    	//Compute the key corresponding to given state
-    	key = makeKey(state);
-    	currentPlayerStates.put(key, value);
-    	otherPlayerStates.put(key, -value);
-    	//Compute the key of the symmetric state
-    	key = getSymmetricState(key);
-    	currentPlayerStates.put(key, value);
-    	otherPlayerStates.put(key, -value);
-    	//Compute the key of the opposed of the symmetric state (in which value is -value)
-    	key = getOpposedState(key);
-    	currentPlayerStates.put(key, -value);
-    	otherPlayerStates.put(key, value);
-    	//Compute the key of the opposed state (in which value is -value)
-    	key = getSymmetricState(key);
-    	currentPlayerStates.put(key, -value);
-    	otherPlayerStates.put(key, value);
-    }
+//    private void addToHash(GameState state, int value) {
+//    	String key = "";
+//    	//Compute the key corresponding to given state
+//    	key = makeKey(state);
+//    	currentPlayerStates.put(key, value);
+//    	otherPlayerStates.put(key, -value);
+//    	//Compute the key of the symmetric state
+//    	key = getSymmetricState(key);
+//    	currentPlayerStates.put(key, value);
+//    	otherPlayerStates.put(key, -value);
+//    	//Compute the key of the opposed of the symmetric state (in which value is -value)
+//    	key = getOpposedState(key);
+//    	currentPlayerStates.put(key, -value);
+//    	otherPlayerStates.put(key, value);
+//    	//Compute the key of the opposed state (in which value is -value)
+//    	key = getSymmetricState(key);
+//    	currentPlayerStates.put(key, -value);
+//    	otherPlayerStates.put(key, value);
+//    }
     
     /**
      * Creates the key for the HashTable of given GameState
