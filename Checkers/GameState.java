@@ -576,12 +576,12 @@ public class GameState {
   public String toString(int pPlayer) {
     // Select preferred printing style by setting cell_text to SIMPLE_TEXT, UNICODE_TEXT or COLOR_TEXT
 
-    final String[] cell_text = Constants.SIMPLE_TEXT;
+    final String[] cell_text = Constants.COLOR_TEXT;
 
-    final String board_top = "   -----------------\r\n";
-    final String board_bottom = "   -----------------\r\n";
-    final String board_left = "| ";
-    final String board_right = "|";
+    final String board_top = (cell_text == Constants.SIMPLE_TEXT) ? "   -----------------\n" : "    ╭─────────────────╮\n";
+    final String board_bottom = (cell_text == Constants.SIMPLE_TEXT) ? "   -----------------\n" : "    ╰─────────────────╯\n";
+    final String board_left = (cell_text == Constants.SIMPLE_TEXT) ? "| " : "│ ";
+    final String board_right = (cell_text == Constants.SIMPLE_TEXT) ? "|" : "│";
 
     int red_pieces = 0;
     int white_pieces = 0;
@@ -606,13 +606,13 @@ public class GameState {
     for(int c = 0; c < 8; c++) {
       ss.append(cell_text[this.get(0, c)]);
     }
-    ss.append(board_right + " 3\r\n");
+    ss.append(board_right + " 3\n");
 
     ss.append("  4 " + board_left);
     for(int c = 0; c < 8; c++) {
       ss.append(cell_text[this.get(1, c)]);
     }
-    ss.append(board_right + " 7\r\n");
+    ss.append(board_right + " 7\n");
 
     ss.append("  8 " + board_left);
     for(int c = 0; c < 8; c++) {
@@ -622,12 +622,12 @@ public class GameState {
 
     if ((pPlayer == Constants.CELL_RED && this.isRedWin()) ||
       (pPlayer == Constants.CELL_WHITE && this.isWhiteWin()) ) {
-      ss.append(" (WOHO! I WON!)\r\n");
+      ss.append(" (WOHO! I WON!)\n");
     } else if ((pPlayer == Constants.CELL_RED && this.isWhiteWin()) ||
         (pPlayer == Constants.CELL_WHITE && this.isRedWin()) ) {
-      ss.append(" (Bummer! I lost!)\r\n");
+      ss.append(" (Bummer! I lost!)\n");
     } else {
-      ss.append("\r\n");
+      ss.append("\n");
     }
 
     ss.append(" 12 " + board_left);
@@ -635,31 +635,31 @@ public class GameState {
       ss.append(cell_text[this.get(3, c)]);
     }
     ss.append(board_right + " 15   Next player: " + cell_text[mNextPlayer] +
-    			((mNextPlayer == pPlayer) ? " (My turn)\r\n" : " (Opponents turn)\r\n"));
+    			((mNextPlayer == pPlayer) ? " (My turn)\n" : " (Opponents turn)\n"));
 
     ss.append(" 16 " + board_left);
     for(int c = 0; c < 8; c++) {
       ss.append(cell_text[this.get(4, c)]);
     }
-    ss.append(board_right + " 19   Moves until draw: " + (int) mMovesUntilDraw + "\r\n");
+    ss.append(board_right + " 19   Moves until draw: " + (int) mMovesUntilDraw + "\n");
 
     ss.append(" 20 " + board_left);
     for(int c = 0; c < 8; c++) {
       ss.append(cell_text[this.get(5, c)]);
     }
-    ss.append(board_right + " 23   Red pieces:   " + red_pieces + "\r\n");
+    ss.append(board_right + " 23   Red pieces:   " + red_pieces + "\n");
 
     ss.append(" 24 " + board_left);
     for(int c = 0; c < 8; c++) {
       ss.append(cell_text[this.get(6,c)]);
     }
-    ss.append(board_right + " 27   White pieces: " + white_pieces + "\r\n");
+    ss.append(board_right + " 27   White pieces: " + white_pieces + "\n");
 
     ss.append(" 28 " + board_left);
     for(int c = 0; c < 8; c++) {
       ss.append(cell_text[this.get(7,c)]);
     }
-    ss.append(board_right + " 31\r\n");
+    ss.append(board_right + " 31\n");
 
     ss.append(board_bottom);
 

@@ -159,6 +159,7 @@ public class Player {
         addToHash(key,v);
         
         return v;
+
     }
     
     /**
@@ -175,6 +176,12 @@ public class Player {
         otherPlayerStates.put(key, -value);
     }
     
+  /**
+     * Creates the hash key for the HashTable of given GameState
+     * Key only depends on the position of the pieces and the player
+     * @param state
+     * @return The key to Hash the provided GameState
+     */
     private String makeHash(GameState state, int depth) {
         String key = state.toMessage();
         String[] parts = key.split(" ");
@@ -229,7 +236,7 @@ public class Player {
             if (isWin(state))
                 return Integer.MAX_VALUE;
             else if (isLoss(state))
-                return Integer.MIN_VALUE + 1;
+                return Integer.MIN_VALUE + 1 // The +1 is because -(Integer.MIN_VALUE + 1) = Integer.MAX_VALUE (MIN_VALUE is 1 unit smaller than -MAX_VALUE);
             else
                 return 0;   // draw
         }

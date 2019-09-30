@@ -16,7 +16,6 @@ public class Player {
      */
     public GameState play(final GameState gameState, final Deadline deadline) {
         whoAmI = gameState.getNextPlayer();
-        System.err.println("I am " + whoAmI);
         return alphabeta(gameState, DEPTH);
     }
     
