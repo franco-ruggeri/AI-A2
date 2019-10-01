@@ -21,11 +21,8 @@ public class Player {
     // repeated state checking
     private HashMap<String, Integer> transpositionTable;
     
-    // move ordering
-    private Vector<String> bestPath;
-    
     // stats
-//    private long nodeVisited;
+    private long nodeVisited;
     
     /**
      * Performs a move
@@ -40,7 +37,7 @@ public class Player {
     	GameState choice;
     	
     	// init stats
-//    	nodeVisited = 0;
+    	nodeVisited = 0;
     	
     	// search move
         whoAmI = pState.getNextPlayer();
@@ -48,8 +45,8 @@ public class Player {
         choice = alphabeta(pState);
         
         // print stats
-//        System.err.println("Node visited: " + nodeVisited);
-//        System.err.println("Max depth reached: " + currentDepth);
+        System.err.println("Node visited: " + nodeVisited);
+        System.err.println("Max depth reached: " + currentDepth);
         
         return choice;
     }
@@ -73,15 +70,12 @@ public class Player {
         
     	currentDepth = INITIAL_DEPTH-1;
     	timeout = false;
-		bestPath = new Vector<>(INITIAL_DEPTH-1);
-		bestPath.setSize(INITIAL_DEPTH-1);
         while (!timeout) {
             // save result of the previous completed iteration
             finalChoice = tmpChoice;
             
             // prepare new iteration
             currentDepth++;
-            bestPath.add(0, null);	// shift others to the right, i.e. element 0 is filled by the second-last deepest level
             transpositionTable = new HashMap<>();
             
             // move ordering
@@ -94,8 +88,6 @@ public class Player {
                 if (tmp > v) {
                     v = tmp;        // max
                     tmpChoice = s;  // argmax
-                    // save best move for move ordering at the next iteration
-                    bestPath.setElementAt(getKey(s, currentDepth), currentDepth-1);
                 }
             }
         }
@@ -116,7 +108,7 @@ public class Player {
         }
         
         // update stats
-//        nodeVisited++;
+        nodeVisited++;
         
         // check repeated state
         key = getKey(state, depth);
@@ -144,11 +136,8 @@ public class Player {
                 int tmp = alphabetaR(s, depth-1, alpha, beta);
                 if (timeout)
                 	return 0;   // end search
-                if (tmp > v) {
+                if (tmp > v)
                     v = tmp;
-                    // save best move for move ordering at the next iteration
-                    bestPath.setElementAt(getKey(s, depth), depth-1);
-                }
                 if (tmp > alpha)
                     alpha = tmp;
                 if (beta <= alpha)
@@ -162,11 +151,8 @@ public class Player {
                 int tmp = alphabetaR(s, depth-1, alpha, beta);
 	            if (timeout)
 	                return 0;   // end search
-                if (tmp < v) {
+                if (tmp < v)
                     v = tmp;
-                    // save best move for move ordering at the next iteration
-                    bestPath.setElementAt(getKey(s, depth), depth-1);
-                }
                 if (tmp < beta)
                     beta = tmp;
                 if (beta <= alpha)
@@ -221,26 +207,26 @@ public class Player {
     	return deadline.timeUntil() <= MARGIN_DEADLINE + TIME_TO_RETURN*depth;
     }
     
-    private void addKnownState(String stateKey, int value) {
-    	transpositionTable.put(stateKey, value);
+    private void addKnownState(String key, int value) {
+    	transpositionTable.put(key, value);
     	// add symmetric state (i.e. columns mirrored)
-	    transpositionTable.put(getSymmetricState(stateKey), value);
+	    transpositionTable.put(getSymmetricState(key), value);
     }
     
     private String getKey(GameState state, int depth) {
     	String[] parts = state.toMessage().split(" ");
     	/*
-    	 * It depends on:
-    	 * - the position of the pieces (parts[0])
-    	 * - the player who has to move (parts[2])
+    	 * It is supposed to be for transpositionTable, so it depends on:
+    	 * - the position of the pieces (parts[0]).
+    	 * - the player who has to move (parts[2]).
     	 * - the depth (an equal state but at a different depth should be expanded
-    	 * 	 until the limit of depth because it can achieve a better estimate)
+    	 * 	 until the limit of depth because it can achieve a better estimate).
     	 */
     	return parts[0] + " " + parts[2] + " " + depth;
     }
     
-    private String getSymmetricState(String stateKey) {
-    	String[] parts = stateKey.split(" ");
+    private String getSymmetricState(String key) {
+    	String[] parts = key.split(" ");
     	String board = parts[0];
     	StringBuffer symmetricKey = new StringBuffer();
     	
@@ -257,38 +243,31 @@ public class Player {
     }
     
     private void moveOrdering(GameState state, Vector<GameState> nextStates, int depth) {
-        String bestNextState = depth > 0 ? bestPath.elementAt(depth-1) : null;
-        Vector<GameState> best, jump, becomeKing, normal;
-        Predicate<GameState> filterBest, filterJump, filterKing;
+        Vector<GameState> jump, becomeKing, normal;
+        Predicate<GameState> filterJump, filterNormal, filterKing;
         
         // filters
-        filterBest = s -> getKey(s, depth).equals(bestNextState);
         filterJump = s -> s.getMove().isJump();
+        filterNormal = s -> s.getMove().isNormal();
         filterKing = s -> hasBecomeKing(state, s);
         
-        // first: best move from previous iteration
-        best = nextStates.stream()
-                .filter(filterBest)
-                .collect(Collectors.toCollection(Vector::new));
-        Collections.shuffle(best);
-        // second: jumps sorted by decreasing length
+        // first: jumps sorted by decreasing length
         jump = nextStates.stream()
-                .filter(filterBest.negate().and(filterJump))
+                .filter(filterJump)
                 .sorted((s1, s2) -> s2.getMove().length() - s1.getMove().length())
                 .collect(Collectors.toCollection(Vector::new));
-        // third: normal moves for which the piece becomes king
+        // second: normal moves for which the piece becomes king
         becomeKing = nextStates.stream()
-                .filter(filterBest.negate().and(filterJump.negate()).and(filterKing))
+                .filter(filterNormal.and(filterKing))
                 .collect(Collectors.toCollection(Vector::new));
         Collections.shuffle(becomeKing);
-        // fourth: the rest of the normal moves
+        // third: the rest of the normal moves
         normal = nextStates.stream()
-                .filter(filterBest.negate().and(filterJump.negate()).and(filterKing.negate()))
+                .filter(filterNormal.and(filterKing.negate()))
                 .collect(Collectors.toCollection(Vector::new));
         Collections.shuffle(normal);
         
         nextStates.clear();
-        nextStates.addAll(best);
         nextStates.addAll(jump);
         nextStates.addAll(becomeKing);
         nextStates.addAll(normal);
