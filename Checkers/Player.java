@@ -10,8 +10,8 @@ public class Player {
 	// optimizations (on/off)
     private static final boolean ITERATIVE_DEEPENING = true;
     private static final boolean REPEATED_STATE_CHECKING = true;
-    private static final boolean SYMMETRY_BREAKING = false;	// only with repeated state checking
-    private static final boolean MOVE_ORDERING = false;
+    private static final boolean SYMMETRY_BREAKING = true;	// only with repeated state checking
+    private static final boolean MOVE_ORDERING = true;
 	
     // iterative deepening
     private static final long MARGIN_DEADLINE = (long) 1e8; // 100 ms of margin
@@ -307,9 +307,9 @@ public class Player {
         Vector<GameState> states1, states2, states3, states4, states5;
         Predicate<GameState> filter1, filter2, filter3;
         
-        filter1 = s -> getKey(s, depth).equals(bestNextState); // best move
-        filter2 = s -> s.getMove().isJump();    // jump move
-        filter3 = s -> hasBecomeKing(state, s);       	// become king
+        filter1 = s -> getKey(s, depth).equals(bestNextState); 	// best move
+        filter2 = s -> s.getMove().isJump();    				// jump move
+        filter3 = s -> hasBecomeKing(state, s);       			// become king
         
         // first: best move from previous iteration
         states1 = nextStates.stream()
