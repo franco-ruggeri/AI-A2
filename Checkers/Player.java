@@ -3,15 +3,15 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class Player {
-	private int whoAmI;		// red or white?
 	private static final int WEIGHT_KING = 5;
-	private static final int WEIGHT_PIECE = 1; 
+	private static final int WEIGHT_PIECE = 1;
+	private int whoAmI;		// red or white?
 	
 	// optimizations (on/off)
     private static final boolean ITERATIVE_DEEPENING = true;
-    private static final boolean REPEATED_STATE_CHECKING = false;
+    private static final boolean REPEATED_STATE_CHECKING = true;
     private static final boolean SYMMETRY_BREAKING = false;	// only with repeated state checking
-    private static final boolean MOVE_ORDERING = true;
+    private static final boolean MOVE_ORDERING = false;
 	
     // iterative deepening
     private static final long MARGIN_DEADLINE = (long) 1e8; // 100 ms of margin
@@ -24,14 +24,13 @@ public class Player {
     // repeated state checking
     private static final int NUMBER_OF_ROWS = 8;
 	private static final int NUMBER_OF_COLUMNS = 4;
-    private HashMap<String, Integer> transpositionTable =  new HashMap<>();
+    private HashMap<String, Integer> transpositionTable = new HashMap<>();
     
     // move ordering
     private Vector<String> bestPath = new Vector<>();
     
     // stats
-    private int nodeVisited;
-    private long executionTime;
+    private long nodeVisited;
     
     /**
      * Performs a move
@@ -47,7 +46,6 @@ public class Player {
     	
     	// init stats
     	nodeVisited = 0;
-    	executionTime = System.currentTimeMillis();
     	
     	// search move
         whoAmI = pState.getNextPlayer();
@@ -55,11 +53,8 @@ public class Player {
         choice = alphabeta(pState);
         
         // print stats
-        executionTime = System.currentTimeMillis() - executionTime;
         System.err.println("Node visited: " + nodeVisited);
         System.err.println("Max depth reached: " + currentDepth);
-        System.err.println("Execution time: " + executionTime);
-        System.err.println();
         
         return choice;
     }
