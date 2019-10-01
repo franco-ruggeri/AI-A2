@@ -3,24 +3,35 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class Player {
-
-    private int whoAmI;
+	private int whoAmI;		// red or white?
+	private static final int WEIGHT_KING = 5;
+	private static final int WEIGHT_PIECE = 1; 
+	
+	// optimizations (on/off)
+    private static final boolean ITERATIVE_DEEPENING = true;
+    private static final boolean REPEATED_STATE_CHECKING = false;
+    private static final boolean SYMMETRY_BREAKING = false;	// only with repeated state checking
+    private static final boolean MOVE_ORDERING = true;
+	
+    // iterative deepening
+    private static final long MARGIN_DEADLINE = (long) 1e8; // 100 ms of margin
+    private static final long TIME_TO_RETURN = (long) 1e5;  // 0.1 ms to return 1 level up in recursion
+    private static final int INITIAL_DEPTH = 8;				// don't start from 1, too much time wasted
     private Deadline deadline;
-    private int maxDepth;       // current iteration (iterative deepening)
     private boolean timeout;    // set to true when deadline is almost reached
-    private Vector<String> bestPath = new Vector<>();   // for move ordering
+    private int currentDepth;  	// depth of current iteration
     
-    //Hash map with the heuristics for Red Player
-    private HashMap<String, Integer> redStates = new HashMap<>();
-    //Hash map with the heuristics for White Player
-    private HashMap<String, Integer> whiteStates = new HashMap<>();
-    //Hash map with the heuristics for the current player (It will point to redStates or whiteStates)
-    private HashMap<String, Integer> currentPlayerStates;
-    //Hash map with the heuristics for the other player (It will point to redStates or whiteStates)
-    private HashMap<String, Integer> otherPlayerStates;
+    // repeated state checking
+    private static final int NUMBER_OF_ROWS = 8;
+	private static final int NUMBER_OF_COLUMNS = 4;
+    private HashMap<String, Integer> transpositionTable =  new HashMap<>();
     
-    private static final long MARGIN_DEADLINE = (long) 1e8; // 100 ms (10000000 ns) of margin
-    private static final long TIME_TO_RETURN = (long) 1e5;  // 0.1 ms (100000 ns) to return 1 level up in recursion
+    // move ordering
+    private Vector<String> bestPath = new Vector<>();
+    
+    // stats
+    private int nodeVisited;
+    private long executionTime;
     
     /**
      * Performs a move
@@ -32,77 +43,123 @@ public class Player {
      * @return the next state the board is in after our move
      */
     public GameState play(final GameState pState, final Deadline pDue) {
-        // assign player
+    	GameState choice;
+    	
+    	// init stats
+    	nodeVisited = 0;
+    	executionTime = System.currentTimeMillis();
+    	
+    	// search move
         whoAmI = pState.getNextPlayer();
-        
         deadline = pDue;
-        return alphabeta(pState);
+        choice = alphabeta(pState);
+        
+        // print stats
+        executionTime = System.currentTimeMillis() - executionTime;
+        System.err.println("Node visited: " + nodeVisited);
+        System.err.println("Max depth reached: " + currentDepth);
+        System.err.println("Execution time: " + executionTime);
+        System.err.println();
+        
+        return choice;
     }
     
     private GameState alphabeta(GameState state) {
         Vector<GameState> nextStates = new Vector<>();
         int v = Integer.MIN_VALUE;
-        GameState finalChoice = new GameState(state, new Move());
-        GameState tmpChoice = new GameState(state, new Move()); 
+        GameState finalChoice = null;
+        GameState tmpChoice = null;
+        
         // fill next states
         state.findPossibleMoves(nextStates);
         
-        // no possible moves, pass
-        if (state.isEOG())
-            return finalChoice;
+        // empty => pass
+        if (nextStates.isEmpty())
+            return new GameState(state, new Move());
 
-        // iterative deepening
-        maxDepth = 8;
-        timeout = false;
-        bestPath.clear();
-        while (!timeout) {
-            // save result of the previous completed iteration
-            finalChoice = tmpChoice;
-            
-            // prepare new iteration
-            maxDepth++;
-            for (int i = 0; i < maxDepth; i++)
-                bestPath.add(0, null);  // shift other elements to right, new position for the new step in depth
-            redStates = new HashMap<String, Integer>();
-            whiteStates = new HashMap<String, Integer>();
-            currentPlayerStates = (whoAmI == Constants.CELL_RED ? redStates : whiteStates);
-            otherPlayerStates = (whoAmI == Constants.CELL_RED ? whiteStates : redStates);
-            
-            // move ordering
-            moveOrdering(nextStates, maxDepth);
-            
-            // find action maximizing the "utility"
-            for (int i=0; i<nextStates.size() && !timeout; i++) {
-                GameState s = nextStates.elementAt(i);
-                int tmp = alphabetaR(s, maxDepth-1, Integer.MIN_VALUE, Integer.MAX_VALUE);
-                if (tmp > v) {
-                    v = tmp;        // max
-                    tmpChoice = s;  // argmax
-                    // save best move for move ordering at the next iteration
-                    bestPath.setElementAt(makeKey(s), maxDepth-1);
+        // no alternatives => useless search
+        if (nextStates.size() == 1)
+        	return nextStates.firstElement();
+        
+        if (ITERATIVE_DEEPENING) {
+        	currentDepth = INITIAL_DEPTH-1;
+        	timeout = false;
+        	if (MOVE_ORDERING) {
+        		bestPath.clear();
+        		bestPath.setSize(INITIAL_DEPTH-1);
+        	}
+            while (!timeout) {
+                // save result of the previous completed iteration
+                finalChoice = tmpChoice;
+                
+                // prepare new iteration
+                currentDepth++;
+                if (MOVE_ORDERING)
+                	bestPath.add(0, null);	// shift others to the right, i.e. element 0 is filled by the second-last deepest level
+                if (REPEATED_STATE_CHECKING)
+                	transpositionTable.clear();
+                
+                // move ordering
+                if (MOVE_ORDERING)
+                	moveOrdering(state, nextStates, currentDepth);
+                
+                // find action maximizing the "utility"
+                for (int i=0; i<nextStates.size() && !timeout; i++) {
+                    GameState s = nextStates.elementAt(i);
+                    int tmp = alphabetaR(s, currentDepth-1, Integer.MIN_VALUE, Integer.MAX_VALUE);
+                    if (tmp > v) {
+                        v = tmp;        // max
+                        tmpChoice = s;  // argmax
+                     // save best move for move ordering at the next iteration
+                        if (MOVE_ORDERING)
+                        	bestPath.setElementAt(getKey(s, currentDepth), currentDepth-1);
+                    }
                 }
             }
+        } else {
+        	currentDepth = INITIAL_DEPTH;
+        	
+        	// move ordering
+        	if (MOVE_ORDERING) {
+        		bestPath.clear();	// it is used in moveOrdering(), so fill it with null 
+        		bestPath.setSize(INITIAL_DEPTH);
+        		moveOrdering(state, nextStates, INITIAL_DEPTH);
+        	}
+        		
+        	// find action maximizing the "utility"
+        	for (GameState s : nextStates) {
+        		int tmp = alphabetaR(s, currentDepth-1, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        		if (tmp > v) {
+        			v = tmp;			// max
+        			finalChoice = s;	// argmax
+        		}
+        	}
         }
+        
         return finalChoice;
     }
     
     private int alphabetaR(GameState state, int depth, int alpha, int beta) {
         int player = state.getNextPlayer();
         Vector<GameState> nextStates = new Vector<>();
-        int v;
+        Integer v;
         
         // check deadline
-        if (timeout(maxDepth - depth)) {
-            timeout = true;
-            return 0;   // end search
+        if (ITERATIVE_DEEPENING) {
+	        if (timeout(currentDepth - depth)) {
+	            timeout = true;
+	            return 0;   // end search
+	        }
         }
         
-        //We retrieve the stored value for this node
-        //If we have something stored, we return that value
-        String key = makeHash(state,depth);
-        Integer stored = currentPlayerStates.get(key);
-        if (stored != null) {
-            return stored;
+        // update stats
+        nodeVisited++;
+        
+        // check repeated state
+        if (REPEATED_STATE_CHECKING) {
+	        v = checkRepeatedState(state, depth);
+	        if (v != null)
+	            return v;
         }
         
         // fill next states
@@ -111,24 +168,28 @@ public class Player {
         // cutoff test
         if (depth == 0 || nextStates.isEmpty()) {
             v = evaluate(state);
-            addToHash(key, v);
+            if (REPEATED_STATE_CHECKING)
+            	addKnownState(state, depth, v);
             return v;
         }
         
         // move ordering
-        moveOrdering(nextStates, depth);
+        if (MOVE_ORDERING)
+        	moveOrdering(state, nextStates, depth);
         
         // it's me, I look for the maximum
         if (player == whoAmI) {
             v = Integer.MIN_VALUE;
             for (GameState s : nextStates) {
                 int tmp = alphabetaR(s, depth-1, alpha, beta);
-                if (timeout)
-                    return 0;   // end search
+                if (ITERATIVE_DEEPENING)
+                	if (timeout)
+                		return 0;   // end search
                 if (tmp > v) {
                     v = tmp;
                     // save best move for move ordering at the next iteration
-                    bestPath.setElementAt(makeKey(s), depth-1);
+                    if (MOVE_ORDERING)
+                    	bestPath.setElementAt(getKey(s, depth), depth-1);
                 }
                 if (tmp > alpha)
                     alpha = tmp;
@@ -141,12 +202,14 @@ public class Player {
             v = Integer.MAX_VALUE;
             for (GameState s : nextStates) {
                 int tmp = alphabetaR(s, depth-1, alpha, beta);
-                if (timeout)
-                    return 0;   // end search
+                if (ITERATIVE_DEEPENING)
+		            if (timeout)
+		                return 0;   // end search
                 if (tmp < v) {
                     v = tmp;
                     // save best move for move ordering at the next iteration
-                    bestPath.setElementAt(makeKey(s), depth-1);
+                    if (MOVE_ORDERING)
+                    	bestPath.setElementAt(getKey(s, depth), depth-1);
                 }
                 if (tmp < beta)
                     beta = tmp;
@@ -155,140 +218,104 @@ public class Player {
             }
         }
         
-        //We finally add to the HashMap the value of that node
-        addToHash(key,v);
+        // add known state for repeated state checking
+        if (REPEATED_STATE_CHECKING)
+        	addKnownState(state, depth, v);
         
         return v;
-
-    }
-    
-    /**
-     * Adds to the HashMap the given GameState and all its symmetries
-     * @param state
-     * @param value The value of given GameState
-     */
-    private void addToHash(String key, int value) {
-        currentPlayerStates.put(key, value);
-        otherPlayerStates.put(key, -value);
-        //Compute the key of the symmetric state
-        key = getSymmetricState(key);
-        currentPlayerStates.put(key, value);
-        otherPlayerStates.put(key, -value);
-    }
-    
-  /**
-     * Creates the hash key for the HashTable of given GameState
-     * Key only depends on the position of the pieces and the player
-     * @param state
-     * @return The key to Hash the provided GameState
-     */
-    private String makeHash(GameState state, int depth) {
-        String key = state.toMessage();
-        String[] parts = key.split(" ");
-        //Only depends on position of the pieces and the player
-        key = parts[0] + " " + parts[2] + " " + depth;
-        return key;
-    }
-
-    
-    /**
-     * Creates the key for the HashTable of given GameState
-     * Key only depends on the position of the pieces and the player
-     * @param state
-     * @return The key to Hash the provided GameState
-     */
-    private String makeKey(GameState state) {
-        String key = state.toMessage();
-        String[] parts = key.split(" ");
-        //Only depends on position of the pieces and the player
-        key = parts[0] + " " + parts[2];
-        return key;
-    }
-    
-    /**
-     * Creates the Symmetric State of given GameState message
-     * @param state
-     * @return
-     */
-    private String getSymmetricState(String state) {
-        String[] parts = state.split(" ");
-        String result = "", player = parts[1], depth = parts[2];
-        int i, j;
-        char c;
-        for (i = 0; i < 8; i++) {
-            //Only the order of columns changes
-            for (j = 3; j >= 0; j--) {
-                c = parts[0].charAt(i*4 + j);
-                result += c;
-            }
-        }
-        return result + " " + player + " " + depth;
     }
     
     private int evaluate(GameState state) {
-        int globalSum = 0;
-        int myPartialSum, othersPartialSum;
-        int i;
-        int piece;
-        
-        // terminal state, the result is certain
+    	int scoreMe = 0;
+    	int scoreOpponent = 0;
+    	int cell;
+    	
+    	// terminal state, the result is certain
         if (state.isEOG()) {
             if (isWin(state))
                 return Integer.MAX_VALUE;
             else if (isLoss(state))
-                return Integer.MIN_VALUE + 1; // The +1 is because -(Integer.MIN_VALUE + 1) = Integer.MAX_VALUE (MIN_VALUE is 1 unit smaller than -MAX_VALUE);
+    			return Integer.MIN_VALUE + 1; // +1 because -(Integer.MIN_VALUE + 1) = Integer.MAX_VALUE (MIN_VALUE is 1 unit smaller than -MAX_VALUE)
             else
                 return 0;   // draw
         }
-        
-        // evaluate
-        myPartialSum = othersPartialSum = 0; 
-        for (i = 0; i < GameState.NUMBER_OF_SQUARES; i++) {
-            piece = state.get(i);
-            if (piece == Constants.CELL_EMPTY)
-                continue;
-            
-            if ((piece & whoAmI) != 0) {
-                if ((piece & Constants.CELL_KING) != 0) {
-                    myPartialSum += 5;
-                } else {                    
-                    myPartialSum += 1;
-                }
-            } else {
-                if ((piece & Constants.CELL_KING) != 0) {
-                    othersPartialSum += 5;
-                } else {                    
-                    othersPartialSum += 1;
-                }
-            }
-        }
-        globalSum = myPartialSum - othersPartialSum;
-        return globalSum;
-    }
-    
-    private boolean isWin(GameState state) {
-        return (whoAmI == Constants.CELL_RED && state.isRedWin()) ||
-                (whoAmI == Constants.CELL_WHITE && state.isWhiteWin());
-    }
-    
-    private boolean isLoss(GameState state) {
-        return (whoAmI == Constants.CELL_RED && state.isWhiteWin()) ||
-                (whoAmI == Constants.CELL_WHITE && state.isRedWin());
+    	
+    	// pieces and kings
+    	for (int i = 0; i < GameState.NUMBER_OF_SQUARES; i++) {
+    		cell = state.get(i);
+    		if (cell == Constants.CELL_EMPTY)
+    			continue;
+    		
+    		if ((cell & whoAmI) != 0) {
+    			if ((cell & Constants.CELL_KING) != 0)
+    				scoreMe += WEIGHT_KING;
+    			else
+    				scoreMe += WEIGHT_PIECE;
+    		} else {
+    			if ((cell & Constants.CELL_KING) != 0)
+    				scoreOpponent += WEIGHT_KING;
+    			else
+    				scoreOpponent += WEIGHT_PIECE;
+    		}
+    	}
+    	
+    	return scoreMe - scoreOpponent;
     }
     
     private boolean timeout(int depth) {
-        return deadline.timeUntil() <= MARGIN_DEADLINE + TIME_TO_RETURN*depth;
+    	return deadline.timeUntil() <= MARGIN_DEADLINE + TIME_TO_RETURN*depth;
     }
     
-    private void moveOrdering(Vector<GameState> nextStates, int depth) {
+    private void addKnownState(GameState state, int depth, int value) {
+    	transpositionTable.put(getKey(state, depth), value);
+    	// add symmetric state (i.e. columns mirrored)
+    	if (SYMMETRY_BREAKING)
+	    	transpositionTable.put(getKey(getSymmetricState(state), depth), value);
+    }
+    
+    private Integer checkRepeatedState(GameState state, int depth) {
+		return transpositionTable.get(getKey(state, depth));
+	}
+    
+    private String getKey(GameState state, int depth) {
+    	String[] parts = state.toMessage().split(" ");
+    	/*
+    	 * It depends on:
+    	 * - the position of the pieces (parts[0])
+    	 * - the player who has to move (parts[2])
+    	 * - the depth (an equal state but at a different depth should be expanded
+    	 * 	 until the limit of depth because it can achieve a better estimate)
+    	 */
+    	return parts[0] + " " + parts[2] + " " + depth;
+    }
+    
+    private GameState getSymmetricState(GameState state) {
+    	String[] parts = state.toMessage().split(" ");
+    	String board = parts[0], newBoard = "";
+    	StringBuffer newState = new StringBuffer();
+    	
+    	// prepare string of the symmetric board
+    	for (int i=0; i<NUMBER_OF_ROWS; i++)
+    		for (int j=NUMBER_OF_COLUMNS-1; j>=0; j--)
+    			newBoard += board.charAt(i*NUMBER_OF_COLUMNS + j);
+    	
+    	// prepare complete string of the symmetric state
+    	newState.append(newBoard);
+    	for (int i=1; i<parts.length; i++)
+    		newState.append(" ").append(parts[i]);
+    	
+    	return new GameState(newState.toString());
+    }
+    
+    private void moveOrdering(GameState state, Vector<GameState> nextStates, int depth) {
         String bestNextState = depth > 0 ? bestPath.elementAt(depth-1) : null;
         Vector<GameState> states1, states2, states3, states4, states5;
         Predicate<GameState> filter1, filter2, filter3;
         
-        filter1 = s -> s.toMessage().equals(bestNextState); // best move
+        filter1 = s -> getKey(s, depth).equals(bestNextState); // best move
         filter2 = s -> s.getMove().isJump();    // jump move
-        filter3 = s -> isBecomingKing(s);       // become king
-
+        filter3 = s -> hasBecomeKing(state, s);       	// become king
+        
         // first: best move from previous iteration
         states1 = nextStates.stream()
                 .filter(filter1)
@@ -323,12 +350,25 @@ public class Player {
         nextStates.addAll(states5);
     }
     
-    private boolean isBecomingKing(GameState state) {
-        Move m = state.getMove();
-        int length = m.length();
-        if (length == 0)
+    private boolean hasBecomeKing(GameState oldState, GameState newState) {
+        Move oldMove = oldState.getMove(), newMove = newState.getMove();
+        int oldLength = oldMove.length(), newLength = newMove.length();
+        if (oldLength == 0 || newLength == 0)
             return false;
-        return (state.get(m.at(length-1)) & Constants.CELL_KING) != 0;
+        
+        boolean wasPiece = (oldState.get(oldMove.at(oldLength-1)) & Constants.CELL_KING) == 0;
+        boolean isKing = (newState.get(newMove.at(newLength-1)) & Constants.CELL_KING) != 0;
+        return wasPiece && isKing;
+    }
+    
+    private boolean isWin(GameState state) {
+        return (whoAmI == Constants.CELL_RED && state.isRedWin()) ||
+                (whoAmI == Constants.CELL_WHITE && state.isWhiteWin());
+    }
+    
+    private boolean isLoss(GameState state) {
+        return (whoAmI == Constants.CELL_RED && state.isWhiteWin()) ||
+                (whoAmI == Constants.CELL_WHITE && state.isRedWin());
     }
     
 }

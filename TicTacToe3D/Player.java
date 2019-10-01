@@ -114,7 +114,7 @@ public class Player {
     		if (isWin(state))
     			return Integer.MAX_VALUE;
     		else if (isLoss(state))
-    			return Integer.MIN_VALUE;
+    			return Integer.MIN_VALUE + 1; // +1 because -(Integer.MIN_VALUE + 1) = Integer.MAX_VALUE (MIN_VALUE is 1 unit smaller than -MAX_VALUE)
     		else
     			return 0;	// draw
     	}
