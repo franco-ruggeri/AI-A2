@@ -102,7 +102,7 @@ public class Player {
         String key;
         
         // check deadline
-        if (timeout(currentDepth - depth)) {
+        if (timeout(depth)) {
             timeout = true;
             return 0;   // end search
         }
@@ -204,7 +204,7 @@ public class Player {
     }
     
     private boolean timeout(int depth) {
-    	return deadline.timeUntil() <= MARGIN_DEADLINE + TIME_TO_RETURN*depth;
+    	return deadline.timeUntil() <= MARGIN_DEADLINE + TIME_TO_RETURN*(currentDepth-depth);
     }
     
     private void addKnownState(String key, int value) {
