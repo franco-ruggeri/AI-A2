@@ -2,6 +2,14 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+/**
+ * Possible improvements:
+ * - Repeated states using Zobrist hashing
+ * - End-game lookup table
+ * 
+ * @author fruggeri
+ */
+
 public class Player {
 	private static final int WEIGHT_KING = 5;
 	private static final int WEIGHT_PIECE = 1;
